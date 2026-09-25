@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  material-selection-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: material_selection_rag_app
+    ports:
+      - "8501:8501"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - LOCAL_MODEL=llama3.2
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models

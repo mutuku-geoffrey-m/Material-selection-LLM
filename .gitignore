@@ -1,0 +1,34 @@
+# Autonomous Agents & AI System Cruft
+.agents/
+.gemini/
+scratch/
+skills/
+brain/
+__pycache__/
+*.pyc
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# Data & Models (Avoid pushing large files to GitHub)
+chroma_db_store/
+models/
+*.safetensors
+*.bin
+*.gguf
+*.pt
+
+# Testing & Caching
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Environment & Secrets
+.env
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
