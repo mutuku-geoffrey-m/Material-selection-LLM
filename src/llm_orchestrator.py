@@ -159,7 +159,8 @@ class LLMOrchestrator:
 
         # Analyze hydrodynamics if water exposure
         hydro_analysis = None
-        if is_submerged:
+        is_aero_blade = engineering_spec.get("synthesized_engineering_spec", {}).get("component_classification") in ["turbine_blade_or_impeller", "turbomachine_blade", "wind_turbine_blade", "automotive_aerodynamic_wing_or_spoiler", "propulsion_propeller"]
+        if is_submerged and is_aero_blade:
             flow_v = engineering_spec.get("numerical_parameters", {}).get("estimated_flow_velocity_ms", 2.4)
             chord_m = engineering_spec.get("numerical_parameters", {}).get("estimated_chord_m", 0.18)
             hydro_analysis = HydrodynamicsEngine.analyze_blade_hydrodynamics(

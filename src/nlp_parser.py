@@ -48,7 +48,7 @@ class NLPTranslationLayer:
         """Predict component and Ashby index from text using trained ML model."""
         model = _get_ml_intent_model()
         if model is None:
-            return None, None, None
+            return None
         return model.predict(prompt)
 
     @classmethod
@@ -63,8 +63,27 @@ class NLPTranslationLayer:
         prompt_lower = prompt_clean.lower()
 
         # 1. Physical Domain & Function Identification
-        # 1. Physical Domain & Function Identification (Comprehensive Everyday Layman Engine)
-        component_type = "generic_mechanical_component"
+        
+        # 1.a FAST ML INTENT MODEL (Instant Local Prediction)
+        component_type = None
+        ml_result = cls.predict_ml_intent(prompt_clean)
+        if isinstance(ml_result, dict):
+            ml_comp = ml_result.get("component_classification")
+            ml_conf = ml_result.get("component_confidence", 0.0)
+            if ml_comp and ml_conf > 0.4:
+                component_type = ml_comp
+
+        # 1.b SEMANTIC LLM ROUTER (Deep Context Understanding)
+        if not component_type:
+            from src.semantic_router import ollama_semantic_classifier
+            component_type = ollama_semantic_classifier(prompt_clean)
+            print(f"DEBUG: semantic router returned {component_type}")
+            
+        if not component_type:
+            component_type = "generic_mechanical_component"
+            run_regex = True
+        else:
+            run_regex = False
         
         # Check culinary cookware with whole-word boundary to avoid matching "panel", "japan", etc.
         import re
@@ -142,7 +161,10 @@ class NLPTranslationLayer:
             "plate" in prompt_lower and not any(w in prompt_lower for w in ["cold plate", "baseplate", "dinner plate", "food plate", "serving plate"])
         )
 
-        if is_cutting_tool:
+
+        if not run_regex:
+            pass # Skip all brittle regex because AI routed it successfully
+        elif is_cutting_tool:
             component_type = "cutting_tool_or_blade"
         elif is_pure_tension:
             component_type = "pure_tension_tie"
@@ -158,7 +180,7 @@ class NLPTranslationLayer:
             component_type = "food_contact_utensil"
         elif any(w in prompt_lower for w in ["water bottle", "bottle", "jug", "flask", "canister", "jar", "canteen", "liquid container"]):
             component_type = "fluid_containment_vessel"
-        elif any(w in prompt_lower for w in ["heatsink", "heat sink", "cpu", "gpu", "cooler", "cooling fin", "cool electronics", "thermal conduction", "heat spreader", "cold plate", "baseplate", "thermal baseplate", "heat pipe", "busbar", "thermal anchor", "cooling jacket", "heat exchanger", "catheter probe tip", "thermal coupling spreader"]) or ("radiator" in prompt_lower and not is_thermal_insulator):
+        elif any(w in prompt_lower for w in ["heatsink", "heat sink", "cpu", "gpu", "cooler", "cooling fin", "cool electronics", "thermal conduction", "heat spreader", "cold plate", "baseplate", "thermal baseplate", "heat pipe", "busbar", "thermal anchor", "cooling jacket", "heat exchanger", "catheter probe tip", "thermal coupling spreader", "iron box", "clothes iron", "heating element"]) or ("radiator" in prompt_lower and not is_thermal_insulator):
             component_type = "thermal_management_heat_sink"
         elif any(w in prompt_lower for w in ["clear like glass", "transparent", "see-through", "optical glass", "window", "lens", "visor", "hud visor", "face shield", "spectacle", "goggles", "viewport", "dome cover", "camera dome"]):
             component_type = "transparent_optical_component"
@@ -176,7 +198,7 @@ class NLPTranslationLayer:
             component_type = "rapid_prototyping_or_toy"
         elif any(w in prompt_lower for w in ["door hinge", "hinge", "latch", "clamp", "bolt", "screw", "heavy hinge", "fastener"]) and not any(w in prompt_lower for w in ["compliant", "snap-fit", "flexure"]):
             component_type = "structural_hardware_or_pivot"
-        elif any(w in prompt_lower for w in ["support beam", "pipe support", "cantilever beam", "beam", "spar", "arm", "lever", "cantilever", "bracket", "mount", "mounting bracket", "solar bracket", "joist", "deck joist", "boom", "gantry boom"]):
+        elif any(w in prompt_lower for w in ["support beam", "pipe support", "cantilever beam", "beam", " arm", "lever", "cantilever", "bracket", "mount", "mounting bracket", "solar bracket", "joist", "deck joist", "boom", "gantry boom"]):
             component_type = "structural_cantilever_beam"
         elif any(w in prompt_lower for w in ["broken pipe", "plumbing", "water pipe", "drain pipe", "fluid tube", "conduit"]) or ("pipe" in prompt_lower and not any(p in prompt_lower for p in ["phone", "heat pipe", "support", "beam", "cantilever"])):
             component_type = "fluid_conduit_plumbing"
@@ -299,7 +321,8 @@ class NLPTranslationLayer:
         is_gear_dry = any(w in prompt_lower for w in ["spur gear", "gear", "bushing", "ring gear"]) and any(w in prompt_lower for w in ["dry", "self-lubricating", "food processing", "starter ring gear", "torque shocks"])
         is_ballistic = any(w in prompt_lower for w in ["ballistic", "bulletproof", "7.62mm", "rifle rounds", "armor plate", "armor"])
         is_brake_caliper = any(w in prompt_lower for w in ["brake caliper", "caliper bridge", "racing brake"])
-        is_pressure_vessel_certified = is_pressure_vessel or any(w in prompt_lower for w in ["200 bar", "300 bar", "700 bar", "6 bar", "scuba", "compressed air tank", "pressure cooker", "autoclave", "accumulator", "storage drum", "compressed air cylinder", "air cylinder"])
+        is_pressure_vessel_certified = is_pressure_vessel or any(w in prompt_lower for w in ["200 bar", "300 bar", "700 bar", "6 bar", "scuba", "compressed air tank", "pressure cooker", "autoclave", "accumulator", "storage drum", "compressed air cylinder", "air cylinder", "oxygen tank", "propane tank"])
+        is_pressure_vessel = is_pressure_vessel or "tank" in prompt_lower or "cylinder" in prompt_lower or "scuba" in prompt_lower
         is_spoke_wire = any(w in prompt_lower for w in ["spoke wire", "wheel spoke"])
         is_balloon_tether = any(w in prompt_lower for w in ["weather balloon", "balloon suspension"])
         is_battery_shield = any(w in prompt_lower for w in ["battery pack", "bottom shield", "road debris puncture"])
@@ -465,7 +488,7 @@ class NLPTranslationLayer:
 
         # 7. Identify Unknowns & Ambiguities (Guardrail Protection)
         detected_ambiguities = []
-        is_blade_or_hydro = is_submerged or component_type in ["turbine_blade_or_impeller", "turbomachine_blade"]
+        is_blade_or_hydro = component_type in ["turbine_blade_or_impeller", "turbomachine_blade", "wind_turbine_blade", "automotive_aerodynamic_wing_or_spoiler", "propulsion_propeller", "cutting_tool_or_blade"] or "blade" in prompt_lower or "propeller" in prompt_lower
         
         if is_blade_or_hydro:
             if ("exact weight" not in prompt_lower and not target_yield_mpa) or any(w in prompt_lower for w in ["don't know", "unknown weight", "not know"]):
@@ -566,7 +589,7 @@ class NLPTranslationLayer:
                 "cutting_edge_hardness_required": is_cutting,
                 "biocompatible_implant_required": is_biomed,
                 "hardened_steel_nozzle_acceptable": True,
-                "post_processing_surface_treatment": "Mandatory UV-curable/Epoxy smoothing to mitigate 40% FDM layer-line hydrodynamic drag penalty" if is_submerged else "Standard deburring / coating"
+                "post_processing_surface_treatment": "Surface smoothing to mitigate hydrodynamic drag penalty" if is_submerged else "Standard deburring / coating"
             },
             "numerical_parameters": {
                 "estimated_flow_velocity_ms": target_velocity_ms or 2.4,

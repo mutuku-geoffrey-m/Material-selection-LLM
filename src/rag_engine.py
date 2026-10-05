@@ -276,6 +276,17 @@ class RAGEngine:
 
         retrieved_context_str = "\n\n".join(context_blocks) if context_blocks else "No relevant context found in verified engineering database."
 
+
+        mfg_process = engineering_spec.get('boundary_conditions_and_constraints', {}).get('manufacturing_process', '').lower()
+        is_fdm = ('fdm' in mfg_process or 'additive' in mfg_process) and 'Universal' not in mfg_process
+        is_aero = 'blade' in user_query.lower() or 'wing' in user_query.lower() or 'propeller' in user_query.lower()
+        
+        dynamic_guardrails = ""
+        if is_fdm:
+            dynamic_guardrails += "4. Address FDM additive manufacturing constraints (e.g. nozzle temperatures, warping).\n"
+        if is_aero:
+            dynamic_guardrails += "5. For aerodynamic/hydrodynamic fluid-flow parts, recommend surface smoothing (e.g. epoxy coating) to reduce drag.\n"
+
         augmented_prompt = f"""You are an Autonomous Expert Materials Science and Mechanical Design Engineer.
 You are assisting a field engineer or localized manufacturer in selecting optimal materials and manufacturing parameters.
 
@@ -296,9 +307,6 @@ VERIFIED RETRIEVED ENGINEERING CONTEXT (GROUND TRUTH):
 STRICT GUARDRAILS & INSTRUCTIONS:
 1. Ground your recommendations strictly in the verified retrieved context and mathematical Ashby derivations.
 2. DO NOT hallucinate material strength numbers or feasibility. If data is unknown or missing, state the gap explicitly.
-3. If the user specifically selects FDM Additive Manufacturing, provide FDM-specific constraints. If the user is evaluating universal metals, do NOT discuss FDM or 3D printing.
-4. Only prescribe epoxy coatings for aerodynamic or hydrodynamic fluid-flow parts (like wings or propellers). DO NOT recommend epoxy for high-heat objects like clothes irons or engines.
-5. Do not talk about blade roots or wind turbines unless the user explicitly asks for a blade or turbine.
-6. Present your final recommendation with a structured Markdown comparison table, structural integrity constraints, and exact manufacturing directives.
-"""
+3. If the user provided a very brief prompt, explicitly list the engineering assumptions the system made based on the generated boundary conditions (e.g., assumed UV exposure, assumed CNC manufacturing). DO NOT hallucinate conditions that are marked as False.\n4. Present your final recommendation with a structured Markdown comparison table, structural integrity constraints, and exact manufacturing directives.
+{dynamic_guardrails}"""
         return augmented_prompt

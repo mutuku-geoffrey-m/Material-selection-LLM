@@ -76,6 +76,20 @@ rag_engine = get_rag_engine()
 
 # Sidebar: System Settings & Ad-Hoc Ashby Explorer
 st.sidebar.title(" Engineering Settings")
+
+# Theme switch logic
+theme_choice = st.sidebar.radio("Application Theme", ["Auto (System Default)", "Light Mode", "Dark Mode"])
+if theme_choice != "Auto (System Default)":
+    import os
+    os.makedirs(".streamlit", exist_ok=True)
+    theme_name = "dark" if theme_choice == "Dark Mode" else "light"
+    with open(".streamlit/config.toml", "w", encoding="utf-8") as f:
+        f.write(f"[theme]\nbase='{theme_name}'\n")
+else:
+    import os
+    if os.path.exists(".streamlit/config.toml"):
+        os.remove(".streamlit/config.toml")
+
 st.sidebar.markdown("**Autonomous Materials Selection System**")
 
 # Dual-Mode Operational Setting
