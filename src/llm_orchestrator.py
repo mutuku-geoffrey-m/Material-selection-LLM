@@ -30,13 +30,13 @@ class LLMOrchestrator:
         local_endpoint: Optional[str] = None,
         cloud_api_key: Optional[str] = None,
         cloud_model: str = "gpt-4o",
-        local_model: str = "llama3:8b"
+        local_model: Optional[str] = None
     ):
         self.mode = mode
         self.local_endpoint = local_endpoint or os.getenv("LOCAL_LLM_ENDPOINT", "http://localhost:11434/api/generate")
         self.cloud_api_key = cloud_api_key or os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
         self.cloud_model = cloud_model
-        self.local_model = local_model
+        self.local_model = local_model or os.getenv("LOCAL_MODEL", "llama3.2")
 
     def set_mode(self, mode: str):
         """Toggle active operating mode."""
@@ -227,10 +227,11 @@ class LLMOrchestrator:
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=8.0) as response:
+            with urllib.request.urlopen(req, timeout=600.0) as response:
                 result = json.loads(response.read().decode("utf-8"))
                 return result.get("response") or result.get("choices", [{}])[0].get("text")
-        except Exception:
+        except Exception as e:
+            print(f"Ollama Connection Error: {repr(e)}")
             return None
 
     def _call_cloud_llm(self, prompt: str) -> Optional[str]:

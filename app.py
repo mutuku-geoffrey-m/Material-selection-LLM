@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 """
 Autonomous LLM-Based Material Selection System - Antigravity Chat-Based Interface.
 Grounded in Michael F. Ashby's optimization methodology, persistent ChromaDB RAG,

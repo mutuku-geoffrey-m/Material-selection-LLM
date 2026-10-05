@@ -126,7 +126,7 @@ class NLPTranslationLayer:
             r'\b(?:thermal insulation|insulator|insulation barrier|thermal barrier|refractory barrier|'
             r'dewar neck|dewar support|fire barrier|thermal runaway|fireproof barrier|contain heat|'
             r'insulation board|kiln refractory|insulating liner|thermal insulating|insulating support neck|'
-            r'fireproof thermal runaway|insulating neck)\b',
+            r'fireproof thermal runaway|insulating neck|boiler|handle|door knob|pot handle|pan handle)\b',
             prompt_lower
         )) or any(w in prompt_lower for w in ["thermal insulation", "insulation refractory barrier", "fireproof thermal runaway", "thermal runaway barrier"])
 
@@ -264,7 +264,7 @@ class NLPTranslationLayer:
             "fireproof", "thermal runaway"
         ]) or ("kiln" in prompt_lower and not any(k in prompt_lower for k in ["kiln-dried", "kiln dried"]))
         is_high_temp = any(w in prompt_lower for w in [
-            "hot", "heat", "high temperature", "thermal", "boiling", "exhaust", "engine", "oven", "furnace"
+            "hot", "heat", "high temperature", "thermal", "boiling", "exhaust", "engine", "oven", "furnace", "boiler"
         ]) or is_cookware or is_refractory
 
         # 3. Structural Mechanics & Loading Intent
