@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 """
-Autonomous LLM-Based Material Selection System - Antigravity Chat-Based Interface.
+Autonomous Computational Material Selection System - Advanced Chat-Based Interface.
 Grounded in Michael F. Ashby's optimization methodology, persistent ChromaDB RAG,
 multi-material physics, and interactive Plotly visualization.
 """
@@ -30,8 +30,8 @@ from src.report_generator import EngineeringReportGenerator
 
 # Page Configuration
 st.set_page_config(
-    page_title="Material Selection AI | Antigravity Chat",
-    page_icon="⚙️",
+    page_title="Material Selection System | Advanced Chat",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -75,15 +75,15 @@ def get_rag_engine():
 rag_engine = get_rag_engine()
 
 # Sidebar: System Settings & Ad-Hoc Ashby Explorer
-st.sidebar.title("⚙️ Engineering Settings")
+st.sidebar.title(" Engineering Settings")
 st.sidebar.markdown("**Autonomous Materials Selection System**")
 
 # Dual-Mode Operational Setting
 mode_selection = st.sidebar.selectbox(
-    "LLM Intelligence Mode:",
+    "Inference Engine:",
     [
         "Local Standalone LLM (llama.cpp / Ollama)",
-        "Cloud API (OpenAI GPT-4 / Gemini)",
+        "Cloud API (OpenSystem GPT-4 / Gemini)",
         "Autonomous Offline Expert Reasoner"
     ],
     index=2
@@ -91,7 +91,7 @@ mode_selection = st.sidebar.selectbox(
 
 mode_map = {
     "Local Standalone LLM (llama.cpp / Ollama)": LLMOrchestrator.MODE_LOCAL,
-    "Cloud API (OpenAI GPT-4 / Gemini)": LLMOrchestrator.MODE_CLOUD,
+    "Cloud API (OpenSystem GPT-4 / Gemini)": LLMOrchestrator.MODE_CLOUD,
     "Autonomous Offline Expert Reasoner": LLMOrchestrator.MODE_AUTONOMOUS_EXPERT
 }
 
@@ -109,7 +109,7 @@ force_fdm = (mfg_scope == "FDM 3D Printing Only")
 orchestrator = LLMOrchestrator(mode=mode_map[mode_selection])
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📊 Ad-Hoc Ashby Plotter")
+st.sidebar.markdown("###  Ad-Hoc Ashby Plotter")
 with st.sidebar.expander("Explore Property Axes & Slopes"):
     plot_x = st.selectbox("X-Axis Property:", ["density", "cost_per_kg_usd", "yield_strength"], index=0)
     plot_y = st.selectbox("Y-Axis Property:", ["youngs_modulus_print_xy", "yield_strength", "thermal_conductivity"], index=0)
@@ -117,8 +117,8 @@ with st.sidebar.expander("Explore Property Axes & Slopes"):
     st.plotly_chart(adhoc_fig, use_container_width=True, key="sidebar_adhoc_ashby_chart")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 💬 Chat History")
-if st.sidebar.button("➕ New Chat", use_container_width=True):
+st.sidebar.markdown("###  Chat History")
+if st.sidebar.button(" New Chat", use_container_width=True):
     new_id = str(uuid.uuid4())
     st.session_state.chat_sessions[new_id] = {
         "title": f"Chat {len(st.session_state.chat_sessions)+1}",
@@ -126,7 +126,7 @@ if st.sidebar.button("➕ New Chat", use_container_width=True):
             {
                 "role": "assistant",
                 "content": (
-                    "👋 Hello! I am your **Autonomous Material Selection & Mechanical Engineering Consultant**.\n\n"
+                    " Hello! I am your **Autonomous Material Selection & Mechanical Engineering Consultant**.\n\n"
                     "Type your query below or click one of the quick starter chips!"
                 ),
                 "payload": None
@@ -144,7 +144,7 @@ if "chat_sessions" in st.session_state:
             st.session_state.current_chat_id = chat_id
             st.rerun()
 
-if st.sidebar.button("🗑️ Clear All History", use_container_width=True):
+if st.sidebar.button(" Clear All History", use_container_width=True):
     del st.session_state.chat_sessions
     st.rerun()
 
@@ -152,8 +152,8 @@ st.sidebar.markdown(f"**Indexed Materials:** {len(MATERIALS_DATABASE)} alloys, c
 st.sidebar.markdown("**RAG Vector Store:** ChromaDB Persistent Index Active")
 
 # Main Page Header
-st.markdown('<div class="main-title">Autonomous LLM-Based Material Selection System</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Universal Mechanical Design & Ashby Optimization Consultant | Antigravity Chat Interface</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">Autonomous Computational Material Selection System</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Universal Mechanical Design & Ashby Optimization Consultant | Advanced Chat Interface</div>', unsafe_allow_html=True)
 
 # Initialize Chat History
 if "chat_sessions" not in st.session_state:
@@ -165,14 +165,14 @@ if "chat_sessions" not in st.session_state:
                 {
                     "role": "assistant",
                     "content": (
-                "👋 Hello! I am your **Autonomous Material Selection & Mechanical Engineering Consultant**.\n\n"
+                " Hello! I am your **Autonomous Material Selection & Mechanical Engineering Consultant**.\n\n"
                 "I analyze non-technical requirements and translate them into rigorous **Michael Ashby performance indices**, "
                 "evaluate empirical degradation (freshwater saturation, UV exposure, fatigue limits), and prescribe exact manufacturing "
                 "directives across **all engineering domains**:\n"
-                "- 🚀 **Aerospace & Marine:** Lightweight spars, hydrofoil turbine blades, boat hulls, rocket nozzles\n"
-                "- 🚲 **Automotive & Sports:** Bicycle frames, racing chassis, crane hooks, suspension arms\n"
-                "- 💻 **Thermal Management:** CPU heat sinks, heat exchangers, thermal barriers\n"
-                "- 🦴 **Biomedical & Consumer:** Orthopedic hip implants, shock-absorbing phone cases, wear-resistant gears\n\n"
+                "-  **Aerospace & Marine:** Lightweight spars, hydrofoil turbine blades, boat hulls, rocket nozzles\n"
+                "-  **Automotive & Sports:** Bicycle frames, racing chassis, crane hooks, suspension arms\n"
+                "-  **Thermal Management:** CPU heat sinks, heat exchangers, thermal barriers\n"
+                "-  **Biomedical & Consumer:** Orthopedic hip implants, shock-absorbing phone cases, wear-resistant gears\n\n"
                 "Type your query below or click one of the quick starter chips!"
             ),
             "payload": None
@@ -186,21 +186,21 @@ c1, c2, c3, c4 = st.columns(4)
 c5, c6, c7, c8 = st.columns(4)
 
 starter_prompt = None
-if c1.button("💧 Micro-Hydro Turbine", help="Kenyan river hydro turbine blade"):
+if c1.button(" Micro-Hydro Turbine", help="Kenyan river hydro turbine blade"):
     starter_prompt = "I want to make a blade that will push water, carry a heavy load, and sit in a river all day, but I don't know the exact weight."
-if c2.button("🚲 Bicycle Frame", help="Lightweight stiff bicycle frame"):
+if c2.button(" Bicycle Frame", help="Lightweight stiff bicycle frame"):
     starter_prompt = "I want to design a lightweight and stiff bicycle frame that won't flex under heavy rider pedaling."
-if c3.button("💻 CPU Heat Sink", help="Thermal management for high power electronics"):
+if c3.button(" CPU Heat Sink", help="Thermal management for high power electronics"):
     starter_prompt = "I need a material for a high-performance CPU heat sink to dissipate 200W of heat as fast as possible."
-if c4.button("🚀 Rocket Nozzle", help="Extreme thermal service at 700°C"):
+if c4.button(" Rocket Nozzle", help="Extreme thermal service at 700°C"):
     starter_prompt = "I need a material for an exhaust nozzle operating under continuous 700 C heat and mechanical stress."
-if c5.button("🦴 Hip Implant", help="Biocompatible orthopedic device"):
+if c5.button(" Hip Implant", help="Biocompatible orthopedic device"):
     starter_prompt = "I need a biocompatible material for an orthopedic hip joint implant that won't corrode in body fluids."
-if c6.button("📱 Phone Case", help="Impact shock absorption"):
+if c6.button(" Phone Case", help="Impact shock absorption"):
     starter_prompt = "I want to make a shock-absorbing smartphone case that will survive high drops without cracking."
-if c7.button("🏗️ Crane Hook", help="Heavy-duty lifting under high load"):
+if c7.button(" Crane Hook", help="Heavy-duty lifting under high load"):
     starter_prompt = "I need a material for a heavy-duty crane lifting hook that must lift 10 tons without brittle fracture."
-if c8.button("⚙️ Low-Friction Gear", help="Precision wear-resistant sliding gear"):
+if c8.button(" Low-Friction Gear", help="Precision wear-resistant sliding gear"):
     starter_prompt = "I need a low-friction, wear-resistant material for high-speed transmission gears with smooth sliding."
 
 # Render Chat History
@@ -215,23 +215,23 @@ for msg_idx, msg in enumerate(st.session_state.chat_sessions[st.session_state.cu
             bnd = spec.get("boundary_conditions_and_constraints", {})
 
             st.markdown(
-                f"<span class='metric-badge'>📌 Component: {ashby.get('component_classification', 'Mechanical')}</span>"
-                f"<span class='metric-badge'>📐 Index: {ashby.get('primary_governing_ashby_index')} ({ashby.get('ashby_mathematical_formula')})</span>"
-                f"<span class='metric-badge'>🏭 Route: {bnd.get('manufacturing_process')}</span>"
-                f"<span class='metric-badge'>⚙️ Engine: {payload.get('mode_used')}</span>",
+                f"<span class='metric-badge'> Component: {ashby.get('component_classification', 'Mechanical')}</span>"
+                f"<span class='metric-badge'> Index: {ashby.get('primary_governing_ashby_index')} ({ashby.get('ashby_mathematical_formula')})</span>"
+                f"<span class='metric-badge'> Route: {bnd.get('manufacturing_process')}</span>"
+                f"<span class='metric-badge'> Engine: {payload.get('mode_used')}</span>",
                 unsafe_allow_html=True
             )
 
             # 2. Interactive Ashby Plotly Chart
             fig = payload.get("chart_figure")
             if fig:
-                st.markdown("#### 📈 Interactive Ashby Property Chart")
+                st.markdown("####  Interactive Ashby Property Chart")
                 st.plotly_chart(fig, use_container_width=True, key=f"history_plotly_chart_{msg_idx}")
 
             # 3. Domain-Specific Deep Dives (Rendered conditionally when relevant!)
             hydro = payload.get("hydro_analysis")
             if hydro:
-                with st.expander("🌊 Fluid Dynamics & Hydrodynamic Roughness Deep Dive", expanded=True):
+                with st.expander(" Fluid Dynamics & Hydrodynamic Roughness Deep Dive", expanded=True):
                     hc1, hc2, hc3 = st.columns(3)
                     hc1.metric("Chord Reynolds Number", f"{hydro['chord_reynolds_number']:,.0f}")
                     hc2.metric("As-Printed FDM Drag Penalty", f"-{hydro['drag_penalty_percent']}% L/D")
@@ -243,9 +243,9 @@ for msg_idx, msg in enumerate(st.session_state.chat_sessions[st.session_state.cu
                     )
 
             if payload.get("is_kenya_case"):
-                with st.expander("🇰🇪 Kenya Micro-Hydro Mini-Grid Economics Deep Dive", expanded=False):
+                with st.expander(" Kenya Micro-Hydro Mini-Grid Economics Deep Dive", expanded=False):
                     kc1, kc2, kc3 = st.columns(3)
-                    kc1.metric("Imported Marine Bronze Cost", "$850 – $1,200 USD")
+                    kc1.metric("Imported Marine Bronze Cost", "$850 - $1,200 USD")
                     kc2.metric("Decentralized 3D Print Cost", "$12.16 USD (~1,580 KES)", delta="-98.6% Cost")
                     kc3.metric("Lead Time Reduction", "10 Hours vs 6 Months", delta="-99.8% Downtime")
                     st.success(
@@ -256,16 +256,16 @@ for msg_idx, msg in enumerate(st.session_state.chat_sessions[st.session_state.cu
             # 4. Anti-Hallucination Verified RAG Context
             retrieved = payload.get("retrieved_chunks", [])
             if retrieved:
-                with st.expander("🛡️ Verified ChromaDB RAG Knowledge Retrieval Chunks"):
+                with st.expander(" Verified ChromaDB RAG Knowledge Retrieval Chunks"):
                     for i, chunk in enumerate(retrieved, 1):
-                        st.markdown(f"**Chunk [{i}] — Source:** `{chunk.get('metadata', {}).get('source')}` | **Similarity:** `{chunk.get('score')}`")
+                        st.markdown(f"**Chunk [{i}] - Source:** `{chunk.get('metadata', {}).get('source')}` | **Similarity:** `{chunk.get('score')}`")
                         st.code(chunk.get("text", ""), language="markdown")
 
             # 5. Download Full Report
             report_md = payload.get("report_markdown")
             if report_md:
                 st.download_button(
-                    label="📥 Download Engineering Specification Report (Markdown)",
+                    label=" Download Engineering Specification Report (Markdown)",
                     data=report_md,
                     file_name="engineering_material_specification_report.md",
                     mime="text/markdown",
@@ -345,21 +345,21 @@ if active_prompt:
 
             # Metric Badges
             st.markdown(
-                f"<span class='metric-badge'>📌 Component: {nlp_spec['synthesized_engineering_spec']['component_classification']}</span>"
-                f"<span class='metric-badge'>📐 Index: {ashby_idx} ({nlp_spec['synthesized_engineering_spec']['ashby_mathematical_formula']})</span>"
-                f"<span class='metric-badge'>🏭 Route: {nlp_spec['boundary_conditions_and_constraints']['manufacturing_process']}</span>"
-                f"<span class='metric-badge'>⚙️ Engine: {result['mode_used']}</span>",
+                f"<span class='metric-badge'> Component: {nlp_spec['synthesized_engineering_spec']['component_classification']}</span>"
+                f"<span class='metric-badge'> Index: {ashby_idx} ({nlp_spec['synthesized_engineering_spec']['ashby_mathematical_formula']})</span>"
+                f"<span class='metric-badge'> Route: {nlp_spec['boundary_conditions_and_constraints']['manufacturing_process']}</span>"
+                f"<span class='metric-badge'> Engine: {result['mode_used']}</span>",
                 unsafe_allow_html=True
             )
 
             # Interactive Plotly Chart
-            st.markdown("#### 📈 Interactive Ashby Property Chart")
+            st.markdown("####  Interactive Ashby Property Chart")
             st.plotly_chart(interactive_chart, use_container_width=True, key=f'active_plotly_chart_{len(st.session_state.chat_sessions[st.session_state.current_chat_id]["messages"])}')
 
             # Hydrodynamic Callout if applicable
             hydro = result.get("hydrodynamic_analysis")
             if hydro:
-                with st.expander("🌊 Fluid Dynamics & Hydrodynamic Roughness Deep Dive", expanded=True):
+                with st.expander(" Fluid Dynamics & Hydrodynamic Roughness Deep Dive", expanded=True):
                     hc1, hc2, hc3 = st.columns(3)
                     hc1.metric("Chord Reynolds Number", f"{hydro['chord_reynolds_number']:,.0f}")
                     hc2.metric("As-Printed FDM Drag Penalty", f"-{hydro['drag_penalty_percent']}% L/D")
@@ -371,22 +371,22 @@ if active_prompt:
                     )
 
             if is_kenya:
-                with st.expander("🇰🇪 Kenya Micro-Hydro Mini-Grid Economics Deep Dive", expanded=False):
+                with st.expander(" Kenya Micro-Hydro Mini-Grid Economics Deep Dive", expanded=False):
                     kc1, kc2, kc3 = st.columns(3)
-                    kc1.metric("Imported Marine Bronze Cost", "$850 – $1,200 USD")
+                    kc1.metric("Imported Marine Bronze Cost", "$850 - $1,200 USD")
                     kc2.metric("Decentralized 3D Print Cost", "$12.16 USD (~1,580 KES)", delta="-98.6% Cost")
                     kc3.metric("Lead Time Reduction", "10 Hours vs 6 Months", delta="-99.8% Downtime")
 
             # Verified RAG Context
             if retrieved_chunks:
-                with st.expander("🛡️ Verified ChromaDB RAG Knowledge Retrieval Chunks"):
+                with st.expander(" Verified ChromaDB RAG Knowledge Retrieval Chunks"):
                     for i, chunk in enumerate(retrieved_chunks, 1):
-                        st.markdown(f"**Chunk [{i}] — Source:** `{chunk.get('metadata', {}).get('source')}` | **Similarity:** `{chunk.get('score')}`")
+                        st.markdown(f"**Chunk [{i}] - Source:** `{chunk.get('metadata', {}).get('source')}` | **Similarity:** `{chunk.get('score')}`")
                         st.code(chunk.get("text", ""), language="markdown")
 
             # Download Report
             st.download_button(
-                label="📥 Download Engineering Specification Report (Markdown)",
+                label=" Download Engineering Specification Report (Markdown)",
                 data=report_text,
                 file_name="engineering_material_specification_report.md",
                 mime="text/markdown"

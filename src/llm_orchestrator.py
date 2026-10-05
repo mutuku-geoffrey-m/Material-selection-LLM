@@ -28,13 +28,13 @@ class LLMOrchestrator:
         self,
         mode: str = MODE_LOCAL,
         local_endpoint: Optional[str] = None,
-        cloud_api_key: Optional[str] = None,
+        
         cloud_model: str = "gpt-4o",
         local_model: Optional[str] = None
     ):
         self.mode = mode
         self.local_endpoint = local_endpoint or os.getenv("LOCAL_LLM_ENDPOINT", "http://localhost:11434/api/generate")
-        self.cloud_api_key = cloud_api_key or os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
+        self.cloud_api_key = None
         self.cloud_model = cloud_model
         self.local_model = local_model or os.getenv("LOCAL_MODEL", "llama3.2")
 
@@ -262,7 +262,7 @@ class LLMOrchestrator:
                 req_data = json.dumps({
                     "model": self.cloud_model,
                     "messages": [
-                        {"role": "system", "content": "You are an expert materials science and mechanical engineering consultant."},
+                        {"role": "system", "content": "You are an expert materials science and mechanical engineering consultant. Respond strictly in professional engineering terminology. NEVER use emojis, em-dashes, or conversational AI preambles like 'Here is...' or 'As an AI...' or 'Based on...'. ALWAYS start your response directly with the first heading (e.g. '### 1. Material Recommendation'). Provide direct, concise, mathematical, and deterministic answers."},
                         {"role": "user", "content": prompt}
                     ],
                     "temperature": 0.2
@@ -318,7 +318,7 @@ class LLMOrchestrator:
                 else "CNC Machining / Foundry Casting"
             )
             table_rows.append(
-                f"| **{m['name']}** | {mat_obj['yield_strength']} – {mat_obj['ultimate_tensile_strength']} MPa | "
+                f"| **{m['name']}** | {mat_obj['yield_strength']} - {mat_obj['ultimate_tensile_strength']} MPa | "
                 f"{m['uv_resistance']} UV; {m['hydrolysis_resistance']} Hydrolysis | "
                 f"Fatigue Limit: {mat_obj['fatigue_strength_limit']} MPa; Elong: {mat_obj['elongation_at_break']}% | "
                 f"{mfg_note} |"
@@ -359,7 +359,7 @@ class LLMOrchestrator:
         elif "heat_sink" in comp_class or ashby_info.get("primary_governing_ashby_index") == AshbyIndex.THERMAL_CONDUCTIVITY:
             response_lines.extend([
                 f"- **Thermal Conduction Optimization (Fourier Physics):** Heat transfer rate across the cooler is governed by Fourier's law ($q = -\\lambda \\nabla T$). The system prioritizes materials maximizing thermal conductivity $\\lambda$.",
-                f"- **Material Comparison:** **{top_mat['name']}** offers supreme thermal conductivity ($\\lambda = {top_mat_data['thermal_conductivity']}\\ \\text{{W/(m·K)}}$), dramatically outperforming structural polymers (0.15–0.35 W/mK) by over 1000x and conventional steel (16–45 W/mK).",
+                f"- **Material Comparison:** **{top_mat['name']}** offers supreme thermal conductivity ($\\lambda = {top_mat_data['thermal_conductivity']}\\ \\text{{W/(m·K)}}$), dramatically outperforming structural polymers (0.15-0.35 W/mK) by over 1000x and conventional steel (16-45 W/mK).",
                 "- **Thermal Spreading:** For high-heat-flux hotspots (CPUs, IGBT power electronics), copper provides optimal thermal spreading resistance, while aluminum alloys provide the best thermal-conductivity-to-mass ratio."
             ])
         elif "frame" in comp_class or "chassis" in comp_class or "bike" in user_prompt.lower() or "bicycle" in user_prompt.lower():
@@ -408,7 +408,7 @@ class LLMOrchestrator:
         elif "toy" in comp_class or "prototyping" in comp_class or "cheap" in user_prompt.lower() or "kid" in user_prompt.lower():
             response_lines.extend([
                 f"- **Prototyping & Consumer Safety:** Desktop prototypes and toys require non-toxic, safe materials with minimal thermal contraction warpage, crisp geometric resolution, and low unit cost.",
-                f"- **Selection Rationale:** **{top_mat['name']}** is the gold standard for rapid prototyping and toys ($20–$25/kg), printing with zero chamber odor or warpage, providing robust yield strength ({top_mat_data['yield_strength']} MPa) safe for handling."
+                f"- **Selection Rationale:** **{top_mat['name']}** is the gold standard for rapid prototyping and toys ($20-$25/kg), printing with zero chamber odor or warpage, providing robust yield strength ({top_mat_data['yield_strength']} MPa) safe for handling."
             ])
         elif "optical" in comp_class or "transparent" in comp_class or "glass" in user_prompt.lower() or "clear" in user_prompt.lower():
             response_lines.extend([
@@ -473,7 +473,7 @@ class LLMOrchestrator:
             response_lines.extend([
                 "### 4. Advanced Composite Manufacturing Directives",
                 "- **Fabrication Method:** Vacuum-bag compression molding or autoclave curing from unidirectional/twill prepreg plies.",
-                "- **Cure Cycle:** Ramp temperature at 2°C/min to 120°C–180°C under 6 bar autoclave pressure with 2-hour dwell for void consolidation.",
+                "- **Cure Cycle:** Ramp temperature at 2°C/min to 120°C-180°C under 6 bar autoclave pressure with 2-hour dwell for void consolidation.",
                 "- **Ply Orientation:** Balanced quasi-isotropic laminate schedule [0°/±45°/90°]s to resist complex multi-axial bending and torsional shear loads.",
                 "- **Trimming & Finishing:** Diamond-coated PCD router tooling with water jet cutting to prevent edge delamination."
             ])
@@ -499,7 +499,7 @@ class LLMOrchestrator:
             response_lines.extend([
                 "### 4. Additive Manufacturing (FDM) Technical Directives",
                 f"- **Nozzle Specification:** {nozzle_note}",
-                f"- **Extrusion Parameters:** Hot-end temperature: **{fdm['nozzle_temperature_min']}°C – {fdm['nozzle_temperature_max']}°C**; Heated bed: **{fdm['bed_temperature_min']}°C – {fdm['bed_temperature_max']}°C**.",
+                f"- **Extrusion Parameters:** Hot-end temperature: **{fdm['nozzle_temperature_min']}°C - {fdm['nozzle_temperature_max']}°C**; Heated bed: **{fdm['bed_temperature_min']}°C - {fdm['bed_temperature_max']}°C**.",
                 f"- **Print Orientation & Anisotropy:** {orientation_note}",
                 f"- **Chamber & Cooling:** {'Heated enclosure recommended (70-90°C)' if fdm.get('enclosure_required') else 'Open-frame printing compatible; part cooling fan 50-100%'}.",
                 "- **Infill Architecture:** Solid 100% rectilinear infill at structural mounting roots; 40% gyroid infill with 4 perimeters along functional body panels."

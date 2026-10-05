@@ -24,7 +24,7 @@ class EngineeringReportGenerator:
 
 **Date Generated:** {timestamp}  
 **Execution System:** {analysis_result.get('mode_used', 'Autonomous Engine')}  
-**Project:** Final Year Capstone — Additive Manufacturing for Decentralized Micro-Hydro (Kenya)
+**Project:** Final Year Capstone - Additive Manufacturing for Decentralized Micro-Hydro (Kenya)
 
 ---
 

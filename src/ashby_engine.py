@@ -1122,7 +1122,7 @@ def create_interactive_ashby_chart(
                 f"Thermal Conductivity: {m.get('thermal_conductivity', 0)} W/(m·K)<br>"
                 f"Max Temp: {m.get('heat_deflection_temp', 0)}°C<br>"
                 f"Cost: ${m.get('cost_per_kg_usd', 0):.2f}/kg<br>"
-                f"{'⭐ TOP RECOMMENDATION' if is_highlighted else ''}"
+                f"{' TOP RECOMMENDATION' if is_highlighted else ''}"
             )
 
         color = family_colors.get(fam, "#6B7280")
@@ -1133,7 +1133,7 @@ def create_interactive_ashby_chart(
             name=fam,
             text=names,
             textposition="top center",
-            textfont=dict(size=9, color="#1F2937"),
+            textfont=dict(size=9, color="rgba(128,128,128,0.5)"),
             hoverinfo="text",
             hovertext=hover_texts,
             marker=dict(
@@ -1203,19 +1203,15 @@ def create_interactive_ashby_chart(
         xaxis=dict(
             title=x_meta["label"],
             type="log" if x_meta["log"] else "linear",
-            showgrid=True,
-            gridcolor="#E5E7EB",
-            zeroline=False
+            showgrid=True, zeroline=False
         ),
         yaxis=dict(
             title=y_meta["label"],
             type="log" if y_meta["log"] else "linear",
-            showgrid=True,
-            gridcolor="#E5E7EB",
-            zeroline=False
+            showgrid=True, zeroline=False
         ),
-        plot_bgcolor="#FFFFFF",
-        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
         legend=dict(
             title=dict(text="Material Families (Click to toggle)"),
             orientation="h",

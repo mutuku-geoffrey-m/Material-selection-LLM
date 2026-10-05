@@ -296,9 +296,9 @@ VERIFIED RETRIEVED ENGINEERING CONTEXT (GROUND TRUTH):
 STRICT GUARDRAILS & INSTRUCTIONS:
 1. Ground your recommendations strictly in the verified retrieved context and mathematical Ashby derivations.
 2. DO NOT hallucinate material strength numbers or feasibility. If data is unknown or missing, state the gap explicitly.
-3. If the application involves submerged continuous water flow (e.g. micro-hydro), explicitly analyze and REJECT PLA due to its empirical 28.4% tensile loss and hydrolytic degradation.
-4. If carbon-fiber composite (such as PETG-CF) is recommended, explicitly stipulate the mandatory requirement for a hardened steel or ruby nozzle (0.4mm - 0.6mm) to prevent catastrophic abrasive bore wear.
-5. In FDM turbine blade applications, address aerodynamic/hydrodynamic surface roughness and prescribe mandatory post-processing (epoxy resin coating such as XTC-3D) to eliminate the 40% lift-to-drag penalty.
+3. If the user specifically selects FDM Additive Manufacturing, provide FDM-specific constraints. If the user is evaluating universal metals, do NOT discuss FDM or 3D printing.
+4. Only prescribe epoxy coatings for aerodynamic or hydrodynamic fluid-flow parts (like wings or propellers). DO NOT recommend epoxy for high-heat objects like clothes irons or engines.
+5. Do not talk about blade roots or wind turbines unless the user explicitly asks for a blade or turbine.
 6. Present your final recommendation with a structured Markdown comparison table, structural integrity constraints, and exact manufacturing directives.
 """
         return augmented_prompt
