@@ -19,24 +19,32 @@ This project was built for a 5th-Year Mechanical Engineering Capstone.
 
 ## 🚀 How to Run this on Your Machine (Step-by-Step)
 
-This application is designed to run 100% locally on your computer. You do not need any cloud servers. Follow these exact steps to fire it up successfully.
+This application is designed to run **100% locally and offline** on your computer. You do not need any cloud servers. Follow these exact steps to fire it up successfully.
 
-### Step 1: Prerequisites
-Before you begin, ensure you have Python installed on your computer.
+### Step 1: Compulsory Pre-requisite (Install Ollama)
+To make this system completely standalone without needing internet or paid AI APIs, it uses **Ollama**. Ollama is a program that allows your computer to download and run the AI's "brain" (the Large Language Model) locally on your own hardware.
+1. Go to [ollama.com](https://ollama.com/) and download/install the app for your operating system.
+2. Open your computer's terminal and run this command to download the AI model:
+   ```bash
+   ollama run llama3.2
+   ```
+*(Keep Ollama running in the background while you use the application).*
+
+### Step 2: Install Python
+Ensure you have Python installed on your computer.
 * Download and install Python (3.10 or newer) from [python.org](https://www.python.org/).
 * *(When installing on Windows, make sure to check the box that says **"Add Python to PATH"**).*
 
-### Step 2: Download the Project
-If you are using Git, clone this repository. Otherwise, click the green **"Code"** button at the top of this page and click **"Download ZIP"**, then extract the folder on your computer.
+### Step 3: Download the Project
+Click the green **"Code"** button at the top of this GitHub page and click **"Download ZIP"**, then extract the folder on your computer.
 
-### Step 3: Open Your Terminal
-Open your computer's terminal (Command Prompt or PowerShell on Windows, Terminal on Mac/Linux) and navigate to the project folder:
+### Step 4: Open Your Terminal
+Open your computer's terminal (Command Prompt or PowerShell) and navigate to the extracted folder:
 ```bash
 cd path/to/Material-selection-LLM
 ```
 
-### Step 4: Create a Virtual Environment (Recommended)
-It is best practice to create a virtual environment to hold the project's dependencies.
+### Step 5: Create a Virtual Environment (Recommended)
 * **On Windows:**
   ```bash
   python -m venv .venv
@@ -47,22 +55,20 @@ It is best practice to create a virtual environment to hold the project's depend
   python3 -m venv .venv
   source .venv/bin/activate
   ```
-*(You should now see `(.venv)` at the beginning of your terminal line).*
 
-### Step 5: Install the Required Libraries
+### Step 6: Install the Required Libraries
 Now, tell Python to install all the necessary packages (like Streamlit, Plotly, and ChromaDB) to make the app work. Run this command:
 ```bash
 pip install -r requirements.txt
 ```
-*(This may take a few minutes to download everything).*
 
-### Step 6: Launch the Application!
+### Step 7: Launch the Application!
 Once the installation finishes, run this command to start the user interface:
 ```bash
 streamlit run app.py
 ```
 
-### Step 7: View in Your Browser
+### Step 8: View in Your Browser
 The terminal will display a local network URL. Open your web browser and go to:
 👉 **http://localhost:8501**
 
@@ -82,5 +88,3 @@ Once the webpage loads, you can immediately test it out!
 * It will generate a dynamic, interactive **Ashby Property Chart** plotting the best materials.
 * It will show you exactly which Engineering Data Sheets it used to verify its answer so you know it isn't hallucinating.
 * You can click the **Download** button at the bottom of the response to save a formal Markdown engineering report.
-
-Enjoy exploring the engine!
