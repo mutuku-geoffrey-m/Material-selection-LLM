@@ -5,6 +5,7 @@ multi-material physics, and interactive Plotly visualization.
 """
 
 import streamlit as st
+import uuid
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
@@ -114,8 +115,35 @@ with st.sidebar.expander("Explore Property Axes & Slopes"):
     st.plotly_chart(adhoc_fig, use_container_width=True, key="sidebar_adhoc_ashby_chart")
 
 st.sidebar.markdown("---")
-if st.sidebar.button("🗑️ Clear Conversation"):
-    st.session_state.messages = []
+st.sidebar.markdown("### 💬 Chat History")
+if st.sidebar.button("➕ New Chat", use_container_width=True):
+    new_id = str(uuid.uuid4())
+    st.session_state.chat_sessions[new_id] = {
+        "title": f"Chat {len(st.session_state.chat_sessions)+1}",
+        "messages": [
+            {
+                "role": "assistant",
+                "content": (
+                    "👋 Hello! I am your **Autonomous Material Selection & Mechanical Engineering Consultant**.\n\n"
+                    "Type your query below or click one of the quick starter chips!"
+                ),
+                "payload": None
+            }
+        ]
+    }
+    st.session_state.current_chat_id = new_id
+    st.rerun()
+
+st.sidebar.markdown("#### Previous Chats")
+if "chat_sessions" in st.session_state:
+    for chat_id, chat_data in reversed(list(st.session_state.chat_sessions.items())):
+        btn_style = "primary" if chat_id == st.session_state.current_chat_id else "secondary"
+        if st.sidebar.button(chat_data["title"], key=f"chat_btn_{chat_id}", type=btn_style, use_container_width=True):
+            st.session_state.current_chat_id = chat_id
+            st.rerun()
+
+if st.sidebar.button("🗑️ Clear All History", use_container_width=True):
+    del st.session_state.chat_sessions
     st.rerun()
 
 st.sidebar.markdown(f"**Indexed Materials:** {len(MATERIALS_DATABASE)} alloys, composites, polymers & ceramics")
@@ -126,11 +154,15 @@ st.markdown('<div class="main-title">Autonomous LLM-Based Material Selection Sys
 st.markdown('<div class="subtitle">Universal Mechanical Design & Ashby Optimization Consultant | Antigravity Chat Interface</div>', unsafe_allow_html=True)
 
 # Initialize Chat History
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": (
+if "chat_sessions" not in st.session_state:
+    initial_id = str(uuid.uuid4())
+    st.session_state.chat_sessions = {
+        initial_id: {
+            "title": "New Chat",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": (
                 "👋 Hello! I am your **Autonomous Material Selection & Mechanical Engineering Consultant**.\n\n"
                 "I analyze non-technical requirements and translate them into rigorous **Michael Ashby performance indices**, "
                 "evaluate empirical degradation (freshwater saturation, UV exposure, fatigue limits), and prescribe exact manufacturing "
@@ -143,7 +175,8 @@ if "messages" not in st.session_state:
             ),
             "payload": None
         }
-    ]
+    ]}}
+    st.session_state.current_chat_id = initial_id
 
 # Quick Starter Chips
 st.markdown("**Quick Starter Prompts:**")
@@ -169,7 +202,7 @@ if c8.button("⚙️ Low-Friction Gear", help="Precision wear-resistant sliding 
     starter_prompt = "I need a low-friction, wear-resistant material for high-speed transmission gears with smooth sliding."
 
 # Render Chat History
-for msg_idx, msg in enumerate(st.session_state.messages):
+for msg_idx, msg in enumerate(st.session_state.chat_sessions[st.session_state.current_chat_id]["messages"]):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         payload = msg.get("payload")
@@ -243,7 +276,10 @@ active_prompt = starter_prompt or user_input
 
 if active_prompt:
     # Append User Message
-    st.session_state.messages.append({"role": "user", "content": active_prompt, "payload": None})
+    current_chat = st.session_state.chat_sessions[st.session_state.current_chat_id]
+    if current_chat["title"].startswith("New Chat") or current_chat["title"].startswith("Chat "):
+        current_chat["title"] = (active_prompt[:25] + "...") if len(active_prompt) > 25 else active_prompt
+    current_chat["messages"].append({"role": "user", "content": active_prompt, "payload": None})
     with st.chat_message("user"):
         st.markdown(active_prompt)
 
@@ -316,7 +352,7 @@ if active_prompt:
 
             # Interactive Plotly Chart
             st.markdown("#### 📈 Interactive Ashby Property Chart")
-            st.plotly_chart(interactive_chart, use_container_width=True, key=f"active_plotly_chart_{len(st.session_state.messages)}")
+            st.plotly_chart(interactive_chart, use_container_width=True, key=f'active_plotly_chart_{len(st.session_state.chat_sessions[st.session_state.current_chat_id]["messages"])}')
 
             # Hydrodynamic Callout if applicable
             hydro = result.get("hydrodynamic_analysis")
@@ -355,7 +391,7 @@ if active_prompt:
             )
 
             # Save to Session State
-            st.session_state.messages.append({
+            st.session_state.chat_sessions[st.session_state.current_chat_id]["messages"].append({
                 "role": "assistant",
                 "content": result["synthesized_response"],
                 "payload": {
