@@ -25,6 +25,10 @@ models/
 .coverage
 htmlcov/
 *.log
+tests/
+run_tests.py
+results_comparison.csv
+scripts/run_comparative_experiment.py
 
 # Environment & Secrets
 .env
