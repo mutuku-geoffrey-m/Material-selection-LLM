@@ -52,38 +52,19 @@ class NLPTranslationLayer:
         return model.predict(prompt)
 
     @classmethod
-    def parse_layman_prompt(cls, prompt: str) -> Dict[str, Any]:
+    def parse_engineering_prompt(cls, prompt: str) -> Dict[str, Any]:
         """
-        Parse non-technical prompt into structured engineering requirements.
-        Handles queries like:
-        "I want to make a blade that will push water, carry a heavy load,
-         and sit in a river all day, but I don't know the exact weight."
+        Parse professional, scientific engineering prompts into verified mechanical
+        engineering parameters, boundary conditions, and Ashby performance constraints.
+        Designed for qualified mechanical engineers providing structured specifications,
+        governing ISO/ASTM/ASME standards, and explicit mechanical properties.
         """
         prompt_clean = prompt.strip()
         prompt_lower = prompt_clean.lower()
 
-        # 1. Physical Domain & Function Identification
-        
-        # 1.a FAST ML INTENT MODEL (Instant Local Prediction)
-        component_type = None
-        ml_result = cls.predict_ml_intent(prompt_clean)
-        if isinstance(ml_result, dict):
-            ml_comp = ml_result.get("component_classification")
-            ml_conf = ml_result.get("component_confidence", 0.0)
-            if ml_comp and ml_conf > 0.4:
-                component_type = ml_comp
 
-        # 1.b SEMANTIC LLM ROUTER (Deep Context Understanding)
-        if not component_type:
-            from src.semantic_router import ollama_semantic_classifier
-            component_type = ollama_semantic_classifier(prompt_clean)
-            print(f"DEBUG: semantic router returned {component_type}")
-            
-        if not component_type:
-            component_type = "generic_mechanical_component"
-            run_regex = True
-        else:
-            run_regex = False
+        # 1. Physical Domain & Function Identification
+        component_type = None
         
         # Check culinary cookware with whole-word boundary to avoid matching "panel", "japan", etc.
         import re
@@ -162,9 +143,7 @@ class NLPTranslationLayer:
         )
 
 
-        if not run_regex:
-            pass # Skip all brittle regex because AI routed it successfully
-        elif is_cutting_tool:
+        if is_cutting_tool:
             component_type = "cutting_tool_or_blade"
         elif is_pure_tension:
             component_type = "pure_tension_tie"
@@ -198,7 +177,7 @@ class NLPTranslationLayer:
             component_type = "rapid_prototyping_or_toy"
         elif any(w in prompt_lower for w in ["door hinge", "hinge", "latch", "clamp", "bolt", "screw", "heavy hinge", "fastener"]) and not any(w in prompt_lower for w in ["compliant", "snap-fit", "flexure"]):
             component_type = "structural_hardware_or_pivot"
-        elif any(w in prompt_lower for w in ["support beam", "pipe support", "cantilever beam", "beam", " arm", "lever", "cantilever", "bracket", "mount", "mounting bracket", "solar bracket", "joist", "deck joist", "boom", "gantry boom"]):
+        elif any(w in prompt_lower for w in ["support beam", "pipe support", "cantilever beam", "beam", " arm", "lever", "cantilever", "bracket", "mount", "mounting bracket", "solar bracket", "joist", "deck joist", "boom", "gantry boom", "strut", "hydrofoil", "spar", "cantilever strut"]):
             component_type = "structural_cantilever_beam"
         elif any(w in prompt_lower for w in ["broken pipe", "plumbing", "water pipe", "drain pipe", "fluid tube", "conduit"]) or ("pipe" in prompt_lower and not any(p in prompt_lower for p in ["phone", "heat pipe", "support", "beam", "cantilever"])):
             component_type = "fluid_conduit_plumbing"
@@ -233,16 +212,29 @@ class NLPTranslationLayer:
         elif any(w in prompt_lower for w in ["spring", "shock", "damper", "buffer", "bumper"]):
             component_type = "elastic_suspension_or_damping"
 
-        # Fallback to trained Machine Learning Intent Model if still generic
-        if component_type == "generic_mechanical_component":
+        # Fallback to trained Machine Learning Intent Model if still unclassified or generic
+        if not component_type or component_type == "generic_mechanical_component":
             ml_model = _get_ml_intent_model()
             if ml_model is not None:
                 try:
                     ml_pred = ml_model.predict(prompt_clean)
-                    if ml_pred.get("component_confidence", 0.0) >= 0.15:
+                    if ml_pred.get("component_confidence", 0.0) >= 0.20:
                         component_type = ml_pred["component_classification"]
                 except Exception:
                     pass
+
+        # Fallback to Semantic LLM Router (Ollama) for novel layman prompts
+        if not component_type or component_type == "generic_mechanical_component":
+            try:
+                from src.semantic_router import ollama_semantic_classifier
+                ai_type = ollama_semantic_classifier(prompt_clean)
+                if ai_type:
+                    component_type = ai_type
+            except Exception:
+                pass
+
+        if not component_type:
+            component_type = "generic_mechanical_component"
 
         # 2. Environmental Constraints Translation
         # Distinguish actual submerged river / hydrokinetic environments from bottles/cups
@@ -542,6 +534,9 @@ class NLPTranslationLayer:
         is_optical = (component_type == "transparent_optical_component" or any(w in prompt_lower for w in ["clear like glass", "transparent", "see-through", "viewport", "visor", "dome cover", "window cover", "face shield", "spectacle", "goggles"])) and not is_cutting
         is_biomed = component_type == "biomedical_device_or_implant" or is_dental or is_spinal or any(w in prompt_lower for w in ["implant", "biocompatible", "biomedical", "femoral", "in vivo", "human body", "prosthetic", "bone replacement", "hip replacement", "orthopedic", "spinal", "spine", "dental", "molar crown", "scalpel", "surgical", "microsurgery", "tissue toxicity", "catheter", "tumor", "hyperthermia", "cranioplasty", "cranial", "medical", "clinical"])
 
+        # Extract any standard engineering codes (e.g. ISO 527, ASTM D638, ASME VIII, DIN 17100)
+        standards_mentioned = re.findall(r'\b(?:ISO|ASTM|ASME|DIN|JIS|BS|EN|SAE|AISI)\s*[-_A-Za-z0-9.]+\b', prompt_clean, re.IGNORECASE)
+
         return {
             "raw_prompt": prompt_clean,
             "synthesized_engineering_spec": {
@@ -549,6 +544,8 @@ class NLPTranslationLayer:
                 "primary_governing_ashby_index": ashby_key,
                 "ashby_mathematical_formula": derived_formula,
                 "ashby_selection_rationale": ashby_reasoning,
+                "governing_standards": standards_mentioned,
+                "target_user_tier": "Qualified Professional Mechanical Engineer",
                 "functional_objective": "Minimize component mass while satisfying mechanical stiffness, failure strength, and environmental longevity constraints."
             },
             "boundary_conditions_and_constraints": {
@@ -566,6 +563,7 @@ class NLPTranslationLayer:
                 "ballistic_armor": is_ballistic,
                 "dewar_support_strut": is_dewar_strut,
                 "brake_caliper_bridge": is_brake_caliper,
+                "is_refractory_application": is_refractory or (target_temp_c is not None and target_temp_c >= 500.0),
                 "is_lox": is_lox,
                 "pressure_vessel_certified": is_pressure_vessel_certified,
                 "spoke_wire": is_spoke_wire,
@@ -588,7 +586,7 @@ class NLPTranslationLayer:
                 "optical_transparency_required": is_optical,
                 "cutting_edge_hardness_required": is_cutting,
                 "biocompatible_implant_required": is_biomed,
-                "hardened_steel_nozzle_acceptable": True,
+                "hardened_steel_nozzle_acceptable": fdm_only_preference,
                 "post_processing_surface_treatment": "Surface smoothing to mitigate hydrodynamic drag penalty" if is_submerged else "Standard deburring / coating"
             },
             "numerical_parameters": {
@@ -618,3 +616,9 @@ class NLPTranslationLayer:
             except ValueError:
                 return None
         return None
+
+    @classmethod
+    def parse_layman_prompt(cls, prompt: str) -> Dict[str, Any]:
+        """Backward-compatible alias for qualified engineering specification parser."""
+        return cls.parse_engineering_prompt(prompt)
+

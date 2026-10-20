@@ -41,7 +41,7 @@ def test_spoiler_material_selection(shared_rag_and_orch):
     top_mat = ranked[0]["name"]
 
     # Top material must be a lightweight structural composite or weatherable polymer
-    assert any(valid in top_mat for valid in ["PA12-CF", "PETG-CF", "ASA", "ABS"])
+    assert any(valid in top_mat for valid in ["CFRP", "Continuous", "PA12-CF", "PETG-CF", "ASA", "ABS"])
 
     # Titanium must be heavily penalized and not in the top 3
     top_3_names = [m["name"] for m in ranked[:3]]

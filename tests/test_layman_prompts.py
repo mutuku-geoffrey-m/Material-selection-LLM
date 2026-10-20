@@ -59,7 +59,7 @@ def test_layman_optical_transparency(system):
     spec = NLPTranslationLayer.parse_layman_prompt(prompt)
     res = orchestrator.generate_recommendation(prompt, spec, prompt, [])
     top = res["ranked_materials"][0]["key"]
-    assert top in ["Polycarbonate", "PC"], f"Expected optical-grade Polycarbonate for clear glass, got {top}"
+    assert top in ["Polycarbonate", "PC", "Polycarbonate_Optical"], f"Expected optical-grade Polycarbonate for clear glass, got {top}"
 
 
 def test_layman_heatsink(system):

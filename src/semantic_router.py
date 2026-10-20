@@ -64,8 +64,9 @@ Respond with ONLY the exact string of the category. Do not add any other words o
             "stream": False,
         }).encode("utf-8")
         
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
         req = urllib.request.Request(
-            "http://localhost:11434/api/generate",
+            f"{base_url}/api/generate",
             data=req_data,
             headers={"Content-Type": "application/json"}
         )

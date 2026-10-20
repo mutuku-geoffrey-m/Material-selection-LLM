@@ -826,6 +826,7 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
         "glass_transition_temp": 2072.0,
         "melting_point_c": 2072.0,  # Melting point °C
         "heat_deflection_temp": 1600.0,  # °C
+        "max_service_temp_c": 1700.0,  # °C (sustained refractory service)
         "thermal_conductivity": 30.0,  # W/(m·K)
         "specific_heat_capacity": 880.0,  # J/(kg·K)
         "water_absorption_24h": 0.0,
@@ -926,6 +927,7 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
         "glass_transition_temp": 1336.0,
         "melting_point_c": 1336.0,  # Solidus °C
         "heat_deflection_temp": 950.0,  # °C (sustains mechanical loads up to 700°C)
+        "max_service_temp_c": 1050.0,  # °C (oxidation and thermal radiation barrier limit)
         "thermal_conductivity": 11.4,  # W/(m·K)
         "specific_heat_capacity": 435.0,  # J/(kg·K)
         "water_absorption_24h": 0.0,
@@ -961,6 +963,31 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
 }
 # Canonical alias for compatibility
 MATERIALS_DATABASE["Alumina_Al2O3"] = MATERIALS_DATABASE["Alumina_Ceramic"]
+
+# Dynamically load the comprehensive materials catalog (1,470+ materials)
+import os
+import json
+
+_CATALOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "materials_catalog.json")
+if os.path.exists(_CATALOG_PATH):
+    try:
+        with open(_CATALOG_PATH, "r", encoding="utf-8") as _f:
+            _catalog = json.load(_f)
+            for _k, _v in _catalog.items():
+                if _k not in MATERIALS_DATABASE:
+                    # Light structural metals (aluminum/magnesium with rho < 3200 kg/m3) have max operating limit of 180°C
+                    if _v.get("density", 0) < 3200 and ("Metal" in _v.get("family", "") or "Alloy" in _v.get("family", "")):
+                        _v["max_service_temp_c"] = min(_v.get("max_service_temp_c", 180.0), 180.0)
+                    if "heat_deflection_temp" not in _v:
+                        _v["heat_deflection_temp"] = _v.get("max_service_temp_c", 350.0)
+                    else:
+                        _v["heat_deflection_temp"] = min(_v["heat_deflection_temp"], _v.get("max_service_temp_c", 350.0))
+                    if "glass_transition_temp" not in _v:
+                        _v["glass_transition_temp"] = 0.0
+                    MATERIALS_DATABASE[_k] = _v
+    except Exception as _e:
+        print(f"Warning loading materials catalog: {_e}")
+
 
 
 COMMON_ALIASES: Dict[str, str] = {

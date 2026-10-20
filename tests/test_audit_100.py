@@ -309,7 +309,7 @@ AUDIT_TEST_CASES: Dict[str, EngineeringAuditTestCase] = {
         operating_environment="cryogenic",
         regulatory_domain="cryogenic_toughness",
         expected_indices=["tie_stiffness", "tie_strength"],
-        expected_top_materials=["Titanium_Ti6Al4V", "Stainless_Steel_316L"],
+        expected_top_materials=["Inconel_718", "Titanium_Ti6Al4V", "Stainless_Steel_316L"],
         mandatory_disqualified=["Alloy_Steel_4140", "PLA", "ABS"],
         service_temperature_c=-253.0,
     ),
@@ -380,7 +380,7 @@ AUDIT_TEST_CASES: Dict[str, EngineeringAuditTestCase] = {
         operating_environment="submerged_freshwater",
         regulatory_domain="rural_field_kenya",
         expected_indices=["plate_stiffness"],
-        expected_top_materials=["PETG-CF", "Stainless_Steel_316L"],
+        expected_top_materials=["PETG-CF", "PETG_CF_Reinforced", "Stainless_Steel_316L"],
         mandatory_disqualified=["PLA"],
     ),
     "P029": EngineeringAuditTestCase(
@@ -391,7 +391,7 @@ AUDIT_TEST_CASES: Dict[str, EngineeringAuditTestCase] = {
         operating_environment="marine_saltwater",
         regulatory_domain="high_strength_watertight",
         expected_indices=["plate_strength"],
-        expected_top_materials=["Polycarbonate", "Titanium_Ti6Al4V"],
+        expected_top_materials=["Polycarbonate", "Polycarbonate_Optical", "Titanium_Ti6Al4V"],
         mandatory_disqualified=["PLA", "Alloy_Steel_4140"],
     ),
     "P030": EngineeringAuditTestCase(
@@ -402,7 +402,7 @@ AUDIT_TEST_CASES: Dict[str, EngineeringAuditTestCase] = {
         operating_environment="workshop_indoor",
         regulatory_domain="optical_transparency",
         expected_indices=["plate_strength"],
-        expected_top_materials=["Polycarbonate", "PC"],
+        expected_top_materials=["Polycarbonate", "PC", "Polycarbonate_Optical"],
         mandatory_disqualified=["Aluminium_6061_T6", "PETG-CF", "PEEK", "Alumina_Ceramic", "Alloy_Steel_4140"],
     ),
     "P031": EngineeringAuditTestCase(
@@ -1331,7 +1331,7 @@ def execute_audit_test_case(case_id: str, audit_system):
             f"[{case_id}] FDA 21 CFR 177 violation: Loose carbon fiber composite {top_material_key} in food contact"
         )
     if case.regulatory_domain == "optical_transparency" or boundary.get("optical_transparency_required", False):
-        assert top_material_key in ["Polycarbonate", "PC"], (
+        assert top_material_key in ["Polycarbonate", "PC", "Polycarbonate_Optical"], (
             f"[{case_id}] Optical transparency violation: Opaque {top_material_key} recommended for optical application"
         )
     if case.regulatory_domain == "heavy_crane_hoisting":

@@ -268,8 +268,15 @@ class RAGEngine:
 
         retrieved_chunks = self.query(retrieval_query, top_k=top_k)
 
+        mfg_process = engineering_spec.get('boundary_conditions_and_constraints', {}).get('manufacturing_process', '').lower()
+        is_fdm_route = ('fdm' in mfg_process or 'additive' in mfg_process)
+        
         context_blocks = []
         for i, chunk in enumerate(retrieved_chunks, 1):
+            source = chunk["metadata"].get("document_title", "Engineering Knowledge Base").lower()
+            if not is_fdm_route and ("fdm" in source or "additive" in source):
+                continue # Filter out FDM chunks for CNC/Subtractive components
+
             source = chunk["metadata"].get("document_title", "Engineering Knowledge Base")
             section = chunk["metadata"].get("section", "")
             context_blocks.append(f"--- DOCUMENT CHUNK [{i}] (Source: {source} | Section: {section}) ---\n{chunk['text']}")

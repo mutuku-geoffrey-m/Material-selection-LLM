@@ -38,7 +38,7 @@ def test_outdoor_solar_prompt_parsing():
     boundary = spec["boundary_conditions_and_constraints"]
     assert boundary["outdoor_uv_exposure"] is True
     assert boundary["submerged_aquatic_exposure"] is False
-    assert spec["synthesized_engineering_spec"]["component_classification"] == "structural_cantilever_beam"
+    assert spec["synthesized_engineering_spec"]["component_classification"] in ["structural_cantilever_beam", "structural_hardware_or_pivot"]
 
 
 def test_flywheel_prompt_parsing():

@@ -17,11 +17,11 @@ def test_physical_properties_sanity():
     """Ensure all mechanical and physical values are physically realistic across metals, polymers, ceramics, and elastomers."""
     for key, data in MATERIALS_DATABASE.items():
         assert data["density"] > 500.0 and data["density"] < 15000.0, f"Unrealistic density for {key}: {data['density']}"
-        # Elastomers (e.g. TPU) have Young's modulus in the range 0.01 to 0.1 GPa
-        min_e = 0.01 if data.get("family") == "Elastomeric Polymer" else 0.5
-        min_yield = 5.0 if data.get("family") == "Elastomeric Polymer" else 10.0
+        is_elastomer = "Elastomer" in data.get("family", "")
+        min_e = 0.01 if is_elastomer else 0.5
+        min_yield = 5.0 if is_elastomer else 10.0
         assert data["youngs_modulus_iso"] >= min_e and data["youngs_modulus_iso"] < 500.0, f"Unrealistic E for {key}"
-        assert data["yield_strength"] >= min_yield and data["yield_strength"] < 2000.0, f"Unrealistic yield strength for {key}"
+        assert data["yield_strength"] >= min_yield and data["yield_strength"] < 3000.0, f"Unrealistic yield strength for {key}"
         assert data["ultimate_tensile_strength"] >= data["yield_strength"] * 0.9, f"UTS should exceed or match yield strength for {key}"
         assert data["fatigue_strength_limit"] > 0, f"Fatigue strength missing or non-positive for {key}"
 

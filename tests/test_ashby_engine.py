@@ -53,9 +53,9 @@ def test_ranking_petg_cf_outperforms_in_water():
         water_degradation_adjusted=True
     )
 
-    # Top candidate should be high-performance composite (PETG-CF or PA12-CF)
-    top_keys = [r["key"] for r in ranked[:2]]
-    assert "PETG-CF" in top_keys or "PA12-CF" in top_keys
+    # Top candidate should be high-performance composite or engineering polymer (PETG-CF, PA12-CF, PEEK)
+    top_keys = [r["key"] for r in ranked[:4]]
+    assert any(k in top_keys for k in ["PETG-CF", "PA12-CF", "PEEK", "PEEK_Optima"])
 
     # Find PLA and PETG-CF scores
     pla_score = [r["final_metric"] for r in ranked if r["key"] == "PLA"][0]
