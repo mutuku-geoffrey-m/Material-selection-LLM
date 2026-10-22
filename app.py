@@ -460,6 +460,21 @@ for s_id, s_data in reversed(list(st.session_state.engineering_sessions.items())
         st.session_state.active_session_id = s_id
         st.rerun()
 
+if len(st.session_state.engineering_sessions) > 1:
+    if st.sidebar.button("Reset All Cases", use_container_width=True):
+        fresh_id = str(uuid.uuid4())[:8]
+        st.session_state.engineering_sessions = {
+            fresh_id: {
+                "title": "Design Case #01",
+                "prompt": "",
+                "result": None,
+                "nlp_spec": None,
+                "chart_fig": None
+            }
+        }
+        st.session_state.active_session_id = fresh_id
+        st.rerun()
+
 st.sidebar.markdown("<div style='border-top: 1px solid #23252a; margin: 16px 0;'></div>", unsafe_allow_html=True)
 
 # Catalog Property Inspector
@@ -547,18 +562,23 @@ with col_left:
         help="Select a calibrated baseline benchmark specification or write custom engineering constraints."
     )
 
-    if selected_preset_key != "Custom Specification (Blank)" and selected_preset_key in preset_dict:
-        # Check if user switched preset
-        if st.session_state.get("last_selected_preset") != selected_preset_key:
-            st.session_state["last_selected_preset"] = selected_preset_key
+    if st.session_state.get("last_selected_preset") != selected_preset_key:
+        st.session_state["last_selected_preset"] = selected_preset_key
+        if selected_preset_key in preset_dict and selected_preset_key != "Custom Specification (Blank)":
             current_session["prompt"] = preset_dict[selected_preset_key]
             current_session["title"] = selected_preset_key.split("(")[0].strip()
+            st.rerun()
+        elif selected_preset_key == "Custom Specification (Blank)":
+            current_session["prompt"] = ""
+            current_session["title"] = "Custom Design Case"
+            st.rerun()
 
     # Technical Specification Text Area
     user_prompt = st.text_area(
         "Technical Engineering Design Brief",
         value=current_session["prompt"],
         height=140,
+        key=f"user_prompt_input_{st.session_state.active_session_id}_{st.session_state.get('last_selected_preset', 'default')}",
         placeholder="Specify functional requirements, loading modes (bending, tension, torsion, internal pressure), operating temperatures, chemical exposure, or governing standards (ASTM, ISO, ASME)…",
         help="Mechanical specifications entered here are parsed for continuum mechanics loading mode, boundary conditions, and environmental degradation kinetic risks."
     )
