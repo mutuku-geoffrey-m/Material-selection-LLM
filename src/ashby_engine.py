@@ -1096,22 +1096,22 @@ def create_interactive_ashby_chart(
     x_meta = prop_meta.get(x_prop, {"label": x_prop, "log": True, "unit": ""})
     y_meta = prop_meta.get(y_prop, {"label": y_prop, "log": True, "unit": ""})
 
-    # Color palette for material families
+    # Muted technical color palette for material families (Linear/Cursor CAD styling)
     family_colors = {
-        "Thermoplastic Polymer": "#3B82F6",
-        "Thermoplastic Copolymer": "#06B6D4",
-        "Thermoplastic Terpolymer": "#6366F1",
-        "Thermoplastic Polyamide": "#8B5CF6",
-        "High-Performance Thermoplastic": "#EC4899",
-        "Short Fiber Reinforced Polymer Composite": "#F97316",
-        "Continuous Fiber Composite": "#EA580C",
-        "Titanium Alloy": "#10B981",
-        "Non-Ferrous Metal Alloy": "#14B8A6",
-        "High-Strength Alloy Steel": "#F43F5E",
-        "Ferrous Metal Alloy": "#E11D48",
-        "Technical Ceramic": "#84CC16",
-        "Elastomeric Polymer": "#A855F7",
-        "Engineering Thermoplastic": "#D946EF"
+        "Thermoplastic Polymer": "#60a5fa",
+        "Thermoplastic Copolymer": "#38bdf8",
+        "Thermoplastic Terpolymer": "#818cf8",
+        "Thermoplastic Polyamide": "#a78bfa",
+        "High-Performance Thermoplastic": "#f472b6",
+        "Short Fiber Reinforced Polymer Composite": "#fb923c",
+        "Continuous Fiber Composite": "#f97316",
+        "Titanium Alloy": "#34d399",
+        "Non-Ferrous Metal Alloy": "#2dd4bf",
+        "High-Strength Alloy Steel": "#f87171",
+        "Ferrous Metal Alloy": "#e11d48",
+        "Technical Ceramic": "#a3e635",
+        "Elastomeric Polymer": "#c084fc",
+        "Engineering Thermoplastic": "#38bdf8"
     }
 
     fig = go.Figure()
@@ -1128,6 +1128,7 @@ def create_interactive_ashby_chart(
         marker_sizes = []
         border_widths = []
         border_colors = []
+        marker_symbols = []
 
         for m in fam_mats:
             x_val = m.get(x_prop, 0.0)
@@ -1151,13 +1152,15 @@ def create_interactive_ashby_chart(
             names.append(m["name"])
 
             if is_highlighted:
-                marker_sizes.append(18)
-                border_widths.append(3)
-                border_colors.append("#F59E0B")  # Gold outline for recommendation
+                marker_sizes.append(15)
+                border_widths.append(2)
+                border_colors.append("#ffffff")
+                marker_symbols.append("diamond")
             else:
-                marker_sizes.append(11)
+                marker_sizes.append(8)
                 border_widths.append(1)
-                border_colors.append("#1F2937")
+                border_colors.append("#1e2025")
+                marker_symbols.append("circle")
 
             hover_texts.append(
                 f"<b>{m['name']}</b><br>"
@@ -1168,10 +1171,10 @@ def create_interactive_ashby_chart(
                 f"Thermal Conductivity: {m.get('thermal_conductivity', 0)} W/(m·K)<br>"
                 f"Max Temp: {m.get('heat_deflection_temp', 0)}°C<br>"
                 f"Cost: ${m.get('cost_per_kg_usd', 0):.2f}/kg<br>"
-                f"{' TOP RECOMMENDATION' if is_highlighted else ''}"
+                f"{'★ GOVERNING SELECTION' if is_highlighted else ''}"
             )
 
-        color = family_colors.get(fam, "#6B7280")
+        color = family_colors.get(fam, "#71717a")
         fig.add_trace(go.Scatter(
             x=x_vals,
             y=y_vals,
@@ -1179,13 +1182,14 @@ def create_interactive_ashby_chart(
             name=fam,
             text=names,
             textposition="top center",
-            textfont=dict(size=9, color="rgba(128,128,128,0.5)"),
+            textfont=dict(size=8, color="rgba(138, 143, 152, 0.45)", family="Inter, sans-serif"),
             hoverinfo="text",
             hovertext=hover_texts,
             marker=dict(
                 size=marker_sizes,
                 color=color,
-                opacity=0.88,
+                opacity=0.82,
+                symbol=marker_symbols,
                 line=dict(width=border_widths, color=border_colors)
             )
         ))
@@ -1234,41 +1238,59 @@ def create_interactive_ashby_chart(
             x=ref_x,
             y=ref_y,
             mode="lines",
-            name=f"{line_label} through {anchor['name']}",
-            line=dict(color="#DC2626", width=2.5, dash="dash"),
+            name=f"{line_label} [{anchor['name']}]",
+            line=dict(color="#ef4444", width=1.5, dash="dash"),
             hoverinfo="name"
         ))
 
-    # Layout styling
-    chart_title = f"Ashby Selection Chart: {y_meta['label']} vs {x_meta['label']}"
+    # Layout styling with Linear / ClickHouse CAD workbench aesthetics
+    chart_title = f"{y_meta['label']} vs {x_meta['label']}"
     if title_suffix:
-        chart_title += f" | {title_suffix}"
+        chart_title += f" // {title_suffix}"
 
     fig.update_layout(
-        title=dict(text=chart_title, font=dict(size=14, color="#1E3A8A")),
+        title=dict(
+            text=chart_title,
+            font=dict(size=12, color="#d0d6e0", family="Inter, -apple-system, sans-serif"),
+            x=0.01,
+            y=0.97
+        ),
         xaxis=dict(
-            title=x_meta["label"],
+            title=dict(text=x_meta["label"], font=dict(size=11, color="#8a8f98")),
             type="log" if x_meta["log"] else "linear",
-            showgrid=True, zeroline=False
+            showgrid=True,
+            gridcolor="#1f2127",
+            gridwidth=1,
+            zeroline=False,
+            tickfont=dict(size=10, color="#62666d")
         ),
         yaxis=dict(
-            title=y_meta["label"],
+            title=dict(text=y_meta["label"], font=dict(size=11, color="#8a8f98")),
             type="log" if y_meta["log"] else "linear",
-            showgrid=True, zeroline=False
+            showgrid=True,
+            gridcolor="#1f2127",
+            gridwidth=1,
+            zeroline=False,
+            tickfont=dict(size=10, color="#62666d")
         ),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#0c0d0e",
+        paper_bgcolor="#0c0d0e",
+        hoverlabel=dict(
+            bgcolor="#141517",
+            bordercolor="#23252a",
+            font=dict(size=11, color="#f7f8f8", family="Inter, monospace")
+        ),
         legend=dict(
-            title=dict(text="Material Families (Click to toggle)"),
+            title=dict(text="MATERIAL FAMILIES", font=dict(size=9, color="#62666d")),
             orientation="h",
             yanchor="bottom",
             y=-0.38,
             xanchor="center",
             x=0.5,
-            font=dict(size=9)
+            font=dict(size=9, color="#8a8f98")
         ),
-        margin=dict(l=50, r=40, t=50, b=90),
-        height=520
+        margin=dict(l=55, r=30, t=45, b=90),
+        height=480
     )
 
     return fig
