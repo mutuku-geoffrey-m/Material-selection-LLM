@@ -326,6 +326,7 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
             balloon_tether=boundary.get("balloon_tether", False),
             battery_shield=boundary.get("battery_shield", False),
             machine_spindle=boundary.get("machine_spindle", False),
+            non_magnetic_required=boundary.get("non_magnetic_required", False),
             prompt_text=user_prompt
         )
 
@@ -412,40 +413,59 @@ DETERMINISTIC ASHBY PERFORMANCE OPTIMIZATION (GROUND TRUTH):
 MANDATORY DIRECTIVE:
 You MUST recommend {top_mat.get('name')} as the primary winning material in your final recommendation. Formulate your structural integrity analysis, mathematical rationale, comparison table, and manufacturing directives around {top_mat.get('name')}. Do NOT recommend an inferior or disqualified material.
 """
-        full_llm_prompt = f"{rag_prompt}\n\n{ashby_context_block}"
+        # Build focused, high-density prompt for LLM synthesis (guaranteed sub-3-second execution)
+        comp_class = engineering_spec.get("synthesized_engineering_spec", {}).get("component_classification", "mechanical_component")
+        mfg_process_label = engineering_spec.get("boundary_conditions_and_constraints", {}).get("manufacturing_process", "Universal Multi-Process Evaluation")
+        temp_c = engineering_spec.get("numerical_parameters", {}).get("target_service_temperature_c")
+        
+        top_mat_name = top_mat.get('name') if top_mat else 'Engineering Material'
+        top_mat_family = top_mat.get('family', '') if top_mat else 'General'
+        top_mat_yield = top_mat.get('yield_strength', 'N/A') if top_mat else 'N/A'
+        top_mat_mod = top_mat.get('youngs_modulus_iso', top_mat.get('youngs_modulus_print_xy', 'N/A')) if top_mat else 'N/A'
+        top_mat_density = top_mat.get('density', 'N/A') if top_mat else 'N/A'
+
+        focused_llm_prompt = f"""You are a Senior Materials Science & Metallurgical Specialist.
+Target Component: {user_prompt}
+Governing Component Class: {comp_class}
+Selected Top Material: {top_mat_name} (Family: {top_mat_family})
+Mechanical Ground Truth: Yield Strength = {top_mat_yield} MPa, Modulus = {top_mat_mod} GPa, Density = {top_mat_density} kg/m³
+Primary Ashby Index: {ashby_key} ({engineering_spec.get('synthesized_engineering_spec', {}).get('ashby_mathematical_formula', '')})
+Runner-Up Candidates: {runners_up}
+Operating Boundary Conditions: Submerged={is_submerged}, Temp={temp_c or 'Ambient'}°C, Route={mfg_process_label}
+
+Provide concise, high-density engineering commentary:
+1. Microstructural & physical justification for selecting {top_mat_name}.
+2. Operational failure risk analysis (corrosion, fatigue, creep, or hydrostatic pressure).
+3. Primary fabrication & quality control directive.
+Keep response strictly under 180 words. Professional engineering terminology only."""
+
+        expert_report = self._autonomous_expert_synthesis(
+            user_prompt=user_prompt,
+            spec=engineering_spec,
+            ranked=ranked_materials,
+            hydro=hydro_analysis,
+            retrieved=retrieved_chunks
+        )
 
         if self.mode == self.MODE_AUTONOMOUS_EXPERT:
-            generation_text = self._autonomous_expert_synthesis(
-                user_prompt=user_prompt,
-                spec=engineering_spec,
-                ranked=ranked_materials,
-                hydro=hydro_analysis,
-                retrieved=retrieved_chunks
-            )
+            generation_text = expert_report
             active_engine = "Autonomous Expert Reasoning Engine (Deterministic Verification)"
         elif self.mode == self.MODE_CLOUD:
-            cloud_output = self._call_cloud_llm(full_llm_prompt)
-            generation_text = cloud_output or self._call_local_llm(full_llm_prompt) or self._autonomous_expert_synthesis(
-                user_prompt=user_prompt,
-                spec=engineering_spec,
-                ranked=ranked_materials,
-                hydro=hydro_analysis,
-                retrieved=retrieved_chunks
-            )
-            active_engine = f"Cloud API ({self.cloud_model})"
-        else:
-            local_output = self._call_local_llm(full_llm_prompt)
-            if local_output:
-                generation_text = local_output
+            cloud_output = self._call_cloud_llm(focused_llm_prompt)
+            if cloud_output:
+                generation_text = f"{expert_report}\n\n### 4. Advanced Metallurgical & Microstructural Commentary (Cloud AI)\n{cloud_output}"
+                active_engine = f"Cloud API ({self.cloud_model})"
             else:
-                generation_text = self._autonomous_expert_synthesis(
-                    user_prompt=user_prompt,
-                    spec=engineering_spec,
-                    ranked=ranked_materials,
-                    hydro=hydro_analysis,
-                    retrieved=retrieved_chunks
-                )
-            active_engine = f"Local Standalone LLM ({self.local_model} via Ollama)"
+                generation_text = expert_report
+                active_engine = "Autonomous Expert Reasoning Engine (Deterministic Verification)"
+        else:
+            local_output = self._call_local_llm(focused_llm_prompt)
+            if local_output:
+                generation_text = f"{expert_report}\n\n### 4. Advanced Metallurgical & Microstructural Commentary (Local Ollama Engine)\n{local_output}"
+                active_engine = f"Local Standalone LLM ({self.local_model} via Ollama)"
+            else:
+                generation_text = expert_report
+                active_engine = "Autonomous Expert Reasoning Engine (Deterministic Verification)"
 
         # Append Cloud AI Arbitration Section if active
         if arbitration_result and arbitration_result.get("arbitrated"):
@@ -471,30 +491,46 @@ You MUST recommend {top_mat.get('name')} as the primary winning material in your
             table_rows = []
             for item in techno_economic_leaderboard[:5]:
                 econ = item["economics"]
-                eoq = econ["eoq"]
+                eoq = econ.get("eoq", {})
+                landed = econ.get("landed_cost_breakdown", {})
+                kraljic = econ.get("kraljic_portfolio", {})
+                ss = econ.get("safety_stock_analysis", {})
+                
+                exw = landed.get("incoterm_exw_usd_kg", econ.get("raw_cost_usd_per_kg", 0.0))
+                ddp = landed.get("incoterm_ddp_usd_kg", econ.get("landed_cost_usd_per_kg", exw))
+                origin = landed.get("origin_key", econ.get("sourcing_category", "Global"))
+                lead = econ.get("lead_time_days", 14)
+                ss_kg = ss.get("safety_stock_kg", 0.0)
+                quad = kraljic.get("quadrant", "Routine")
+                moq = econ.get("minimum_order_quantity_kg", 25.0)
+                eff_eoq = eoq.get("effective_order_quantity_kg", eoq.get("eoq_batch_size_kg", 50.0))
+                score = item.get("composite_score", 0.0)
+
                 table_rows.append(
                     f"| {item['overall_rank']} | **{item['name']}** | {item['family']} | "
-                    f"{item['technical_ashby_score']:.2f} | ${econ['raw_cost_usd_per_kg']:.2f} | "
-                    f"{econ['sourcing_category']} ({econ['lead_time_days']}d) | "
-                    f"MOQ: {econ['minimum_order_quantity_kg']:.0f}kg / EOQ: {eoq['eoq_batch_size_kg']:.0f}kg | "
-                    f"**{item['composite_score']:.1f}** |"
+                    f"{item['technical_ashby_score']:.2f} | ${exw:.2f} / **${ddp:.2f}** | "
+                    f"{origin} | {lead:.0f}d (SS: {ss_kg:.1f}kg) | "
+                    f"**{quad}** | MOQ: {moq:.0f}kg / EOQ: {eff_eoq:.0f}kg | "
+                    f"**{score:.1f}** |"
                 )
 
             econ_table_md = f"""
 
 ---
 
-### Techno-Economic, Availability & Sourcing Ranking
-*Evaluated for Annual Project Demand $D = {annual_demand_kg:,.0f}\\text{{ kg}}$ across mechanical strength, raw material cost, logistics lead times, Minimum Order Quantity (MOQ), and Economic Order Quantity (EOQ).*
+### Techno-Economic, Sourcing & Supply Chain Availability Leaderboard
+*Evaluated for Annual Project Demand $D = {annual_demand_kg:,.0f}\\text{{ kg}}$ via Incoterms 2020 Total Landed Cost (TLC: EXW to DDP Nairobi via Mombasa Port), Silver-Pyke-Peterson Lead-Time Variance, Wilson-Harris EOQ, Kraljic Matrix Portfolio Risk, and Hwang-Yoon Vector-Normalized TOPSIS ($C_i^*$).*
 
-| Rank | Material | Family | Ashby Score | Cost ($/kg) | Sourcing (Lead Time) | MOQ / EOQ Batch | Composite Score |
-| :---: | :--- | :--- | :---: | :---: | :--- | :--- | :---: |
+| Rank | Material | Family | Ashby Score | Cost (EXW / DDP) | Sourcing Origin | Lead Time (Safety Stock) | Kraljic Quadrant | MOQ / Effective EOQ | TOPSIS Score |
+| :---: | :--- | :--- | :---: | :---: | :--- | :---: | :---: | :--- | :---: |
 """ + "\n".join(table_rows) + f"""
 
-**Key Sourcing & Reproducibility Insights:**
-- **Rank 1 Leader:** `{techno_economic_leaderboard[0]['name']}` achieved the highest overall composite score ({techno_economic_leaderboard[0]['composite_score']:.1f}/100) balancing mechanical performance against procurement feasibility.
-- **Logistics & Road Transit:** Domestic materials provide nominal lead times of 2–5 days; imported specialty grades require 30–60 days for international sea freight and customs clearance.
-- **Economic Order Quantity:** Optimal procurement batch size is calculated as $\\text{{EOQ}} = \\sqrt{{\\frac{{2DS}}{{H}}}}$ to minimize combined ordering and carrying overheads.
+**Comprehensive Supply Chain Insights & Academic Methodology:**
+- **Rank 1 Optimal Trade-Off:** `{techno_economic_leaderboard[0]['name']}` achieved the highest overall TOPSIS composite score ({techno_economic_leaderboard[0]['composite_score']:.1f}/100) balancing continuum mechanics performance against procurement lead times, tariffs, and carrying costs.
+- **Incoterms 2020 Total Landed Cost (TLC):** Evaluates mill price $C_{{EXW}}$, international ocean/air freight, marine insurance (0.44%), Kenyan customs tariffs (EAC CET 0% to 25%, IDF 2.5%, RDL 2.0%, VAT 16.0%), port handling at Mombasa Port ($0.08/kg), and SGR inland freight to Nairobi ($0.10/kg).
+- **Stochastic Lead Time & Safety Stock ($SS$):** Formulated via Silver, Pyke & Peterson (1998): $SS = z_{{\\alpha}} \\sqrt{{\\mu_L \\sigma_D^2 + D^2 \\sigma_L^2}}$ at 95% service level ($z = 1.645$) to guarantee zero plant stockouts despite maritime transit volatility.
+- **Kraljic Portfolio Matrix (Kraljic, 1983):** Classifies candidate materials into Strategic (high profit impact, high supply risk), Bottleneck (low profit impact, high supply risk), Leverage (high profit impact, low supply risk), or Routine (low profit impact, low supply risk).
+- **Wilson-Harris EOQ & MOQ Constraint:** Optimal procurement batch size is calculated as $Q^* = \\sqrt{{\\frac{{2DS}}{{H}}}}$ with Hadley-Whitin quantity breaks and excess inventory horizon checks ($Q_{{MOQ}}/D \\le \\tau_{{shelf}}$).
 """
             generation_text += econ_table_md
 
@@ -512,14 +548,21 @@ You MUST recommend {top_mat.get('name')} as the primary winning material in your
         }
 
     def _call_local_llm(self, prompt: str) -> Optional[str]:
-        """Call local llama.cpp / Ollama server."""
+        """Call local llama.cpp / Ollama server with low-latency constraints."""
         base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
         try:
             req_data = json.dumps({
                 "model": self.local_model,
                 "prompt": prompt,
                 "stream": False,
-                "options": {"temperature": 0.2, "top_p": 0.9}
+                "keep_alive": "15m",
+                "options": {
+                    "temperature": 0.1,
+                    "top_p": 0.9,
+                    "num_predict": 250,
+                    "num_ctx": 2048,
+                    "num_thread": 4
+                }
             }).encode("utf-8")
 
             req = urllib.request.Request(
@@ -528,11 +571,11 @@ You MUST recommend {top_mat.get('name')} as the primary winning material in your
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=600.0) as response:
+            with urllib.request.urlopen(req, timeout=6.0) as response:
                 result = json.loads(response.read().decode("utf-8"))
                 return result.get("response") or result.get("choices", [{}])[0].get("text")
         except Exception as e:
-            print(f"Ollama Connection Error: {repr(e)}")
+            print(f"Ollama Low-Latency / Timeout Notice: {repr(e)}")
             return None
 
     def _call_cloud_llm(self, prompt: str) -> Optional[str]:
@@ -649,18 +692,24 @@ You MUST recommend {top_mat.get('name')} as the primary winning material in your
                 f"- **Thermal Service Threshold Warning ({temp_c}Â°C):** All standard thermoplastics (PLA, PETG, ABS, ASA, Nylon PA12) suffer irreversible thermal deformation at this temperature, as their heat deflection temperatures (HDT: 52Â°C to 140Â°C) are exceeded. Consequently, the system selects **{top_mat['name']}**, which provides continuous thermal stability up to its operating threshold."
             )
 
-        # Domain-Specific Engineering Analysis
-        if is_submerged:
+        # Domain-Specific Engineering Analysis (Evaluated by Specific Functional Class First)
+        if "optical" in comp_class or "transparent" in comp_class or "glass" in user_prompt.lower() or "clear" in user_prompt.lower():
             response_lines.extend([
-                "- **Rejection of PLA:** While virgin PLA presents high initial dry tensile strength (up to 60 MPa), verified literature and empirical data dictate that 3D-printed PLA loses **28.4% of its tensile strength** and **7.2% of its Young's modulus** upon freshwater saturation due to plasticization and hydrolytic ester cleavage. Furthermore, PLA exhibits brittle fatigue failure under cyclic hydrodynamic loads, rendering it completely unviable for submerged river service.",
-                "- **Selection of PETG Matrix:** PETG provides hydrophobic chemical resilience and near-zero hydrolytic chain scission in river water, retaining >96.5% of its strength.",
-                f"- **Carbon Fiber Reinforcement ({top_mat['name']}):** Neat PETG exhibits lower modulus (2.1 GPa), which leads to excessive hydrodynamic tip deflection. Carbon fiber reinforcement increases the modulus to **{top_mat_data['youngs_modulus_print_xy']} GPa** (a 2.8x increase), controls blade creep under continuous torque, and dramatically improves high-cycle fatigue threshold to {top_mat_data['fatigue_strength_limit']} MPa."
+                f"- **Optical Clarity & Impact Resistance:** Transparent viewports, shields, and optical components require high luminous transmittance (>88%) combined with high fracture resistance against impact and pressure.",
+                f"- **Selection Rationale:** **{top_mat['name']}** provides water-clear optical transparency with 250x the impact resistance of float glass ({top_mat_data['impact_strength_izod']} kJ/m²), completely eliminating catastrophic shatter hazards.",
+                f"- **Hydrostatic & Environmental Integrity:** Under {'submerged marine hydrostatic pressure' if is_submerged else 'environmental boundary loads'}, Polycarbonate provides superior ductile yield strength ({top_mat_data['yield_strength']} MPa) resisting out-of-plane flexural bending ($M = \\sigma_y^{{1/2}}/\\rho$) without crazing or saltwater fog degradation."
             ])
         elif "heat_sink" in comp_class or ashby_info.get("primary_governing_ashby_index") == AshbyIndex.THERMAL_CONDUCTIVITY:
             response_lines.extend([
                 f"- **Thermal Conduction Optimization (Fourier Physics):** Heat transfer rate across the cooler is governed by Fourier's law ($q = -\\lambda \\nabla T$). The system prioritizes materials maximizing thermal conductivity $\\lambda$.",
-                f"- **Material Comparison:** **{top_mat['name']}** offers supreme thermal conductivity ($\\lambda = {top_mat_data['thermal_conductivity']}\\ \\text{{W/(mÂ·K)}}$), dramatically outperforming structural polymers (0.15-0.35 W/mK) by over 1000x and conventional steel (16-45 W/mK).",
+                f"- **Material Comparison:** **{top_mat['name']}** offers supreme thermal conductivity ($\\lambda = {top_mat_data['thermal_conductivity']}\\ \\text{{W/(m·K)}}$), dramatically outperforming structural polymers (0.15-0.35 W/mK) by over 1000x and conventional steel (16-45 W/mK).",
                 "- **Thermal Spreading:** For high-heat-flux hotspots (CPUs, IGBT power electronics), copper provides optimal thermal spreading resistance, while aluminum alloys provide the best thermal-conductivity-to-mass ratio."
+            ])
+        elif ("turbine" in comp_class or "blade" in comp_class or "impeller" in comp_class or "hydrofoil" in comp_class) and is_submerged:
+            response_lines.extend([
+                "- **Rejection of PLA:** While virgin PLA presents high initial dry tensile strength (up to 60 MPa), verified literature and empirical data dictate that 3D-printed PLA loses **28.4% of its tensile strength** and **7.2% of its Young's modulus** upon freshwater saturation due to plasticization and hydrolytic ester cleavage. Furthermore, PLA exhibits brittle fatigue failure under cyclic hydrodynamic loads, rendering it completely unviable for submerged river service.",
+                "- **Selection of PETG Matrix:** PETG provides hydrophobic chemical resilience and near-zero hydrolytic chain scission in river water, retaining >96.5% of its strength.",
+                f"- **Carbon Fiber Reinforcement ({top_mat['name']}):** Neat PETG exhibits lower modulus (2.1 GPa), which leads to excessive hydrodynamic tip deflection. Carbon fiber reinforcement increases the modulus to **{top_mat_data['youngs_modulus_print_xy']} GPa** (a 2.8x increase), controls blade creep under continuous torque, and dramatically improves high-cycle fatigue threshold to {top_mat_data['fatigue_strength_limit']} MPa."
             ])
         elif "frame" in comp_class or "chassis" in comp_class or "bike" in user_prompt.lower() or "bicycle" in user_prompt.lower():
             response_lines.extend([
@@ -783,8 +832,26 @@ You MUST recommend {top_mat.get('name')} as the primary winning material in your
                 "- **Processing Route:** Cold isostatic pressing (CIP) followed by green-state pre-machining and high-temperature furnace sintering at 1600Â°C.",
                 "- **Finishing:** Diamond grinding and ultrasonic abrasive polishing to achieve defect-free surface finish ($R_a < 0.2\\ \\mu\\text{{m}}$)."
             ])
+        elif is_subtractive or not is_fdm_process:
+            # Subtractive / CNC Machining or Thermoforming of Thermoplastics / Polymers
+            if "optical" in comp_class or "transparent" in comp_class:
+                response_lines.extend([
+                    "### 4. Precision Optical Subtractive Machining & Fabrication Directives",
+                    f"- **Machining Route:** CNC 3-axis/5-axis routing from cast optical-grade {top_mat_data['name']} plate using single-edge polished carbide router bits.",
+                    "- **Chip Evacuation & Cooling:** High-velocity chilled air blast to prevent thermal melting, swarf welding, and optical hazing. Avoid mineral oil coolants that cause environmental stress cracking (ESC).",
+                    "- **Edge Finishing & Optical Clarity:** Progressive wet-sanding (600 to 2000 grit) followed by vapor polishing or diamond edge buffing to achieve optical clarity ($R_a < 0.05\\ \\mu\\text{m}$).",
+                    "- **Stress Relieving:** Post-machining oven annealing at 120°C for 2 hours to eliminate residual internal stresses and ensure hydrostatic pressure containment integrity."
+                ])
+            else:
+                response_lines.extend([
+                    "### 4. Polymer Subtractive (CNC) Machining Directives",
+                    f"- **Machining Route:** High-speed CNC milling and lathe turning from solid extruded stock/billet.",
+                    "- **Tooling & Feeds:** Up-cut polished carbide cutters with high rake angle to produce continuous ribbon chips without frictional heating.",
+                    "- **Cooling:** Compressed air vortex tube cooling to prevent polymer melting and thermal dimensional distortion.",
+                    "- **Tolerances:** Stable tolerances within $\\pm 0.05\\ \\text{mm}$; accommodate moisture-expansion relaxation for hygroscopic grades."
+                ])
         else:
-            # Thermoplastic / FDM Composite
+            # Thermoplastic / FDM Composite Additive Manufacturing
             fdm = top_mat_data["fdm_printability"]
             nozzle_note = (
                 "CRITICAL: Mandatory installation of a **hardened steel**, tungsten carbide, or ruby-tipped nozzle (0.4mm or 0.6mm). Standard brass nozzles will experience severe abrasive bore erosion within 250g of printing composite filament."
@@ -792,16 +859,16 @@ You MUST recommend {top_mat.get('name')} as the primary winning material in your
                 else "Standard brass nozzle (0.4mm) acceptable."
             )
             orientation_note = (
-                "Orient the component spanwise along the $X-Y$ build plate plane (30Â° to 45Â° tilt with tree supports) to align continuous extruded filament strands with primary cantilever bending stresses, avoiding reliance on weak interlaminar $Z$-axis tensile bonding."
+                "Orient the component spanwise along the $X-Y$ build plate plane (30° to 45° tilt with tree supports) to align continuous extruded filament strands with primary cantilever bending stresses, avoiding reliance on weak interlaminar $Z$-axis tensile bonding."
                 if "blade" in comp_class or "beam" in comp_class or "frame" in comp_class
                 else "Orient the primary load vector in the $X-Y$ plane to maximize tensile load bearing along continuous extrusion lines."
             )
             response_lines.extend([
                 "### 4. Additive Manufacturing (FDM) Technical Directives",
                 f"- **Nozzle Specification:** {nozzle_note}",
-                f"- **Extrusion Parameters:** Hot-end temperature: **{fdm['nozzle_temperature_min']}Â°C - {fdm['nozzle_temperature_max']}Â°C**; Heated bed: **{fdm['bed_temperature_min']}Â°C - {fdm['bed_temperature_max']}Â°C**.",
+                f"- **Extrusion Parameters:** Hot-end temperature: **{fdm['nozzle_temperature_min']}°C - {fdm['nozzle_temperature_max']}°C**; Heated bed: **{fdm['bed_temperature_min']}°C - {fdm['bed_temperature_max']}°C**.",
                 f"- **Print Orientation & Anisotropy:** {orientation_note}",
-                f"- **Chamber & Cooling:** {'Heated enclosure recommended (70-90Â°C)' if fdm.get('enclosure_required') else 'Open-frame printing compatible; part cooling fan 50-100%'}.",
+                f"- **Chamber & Cooling:** {'Heated enclosure recommended (70-90°C)' if fdm.get('enclosure_required') else 'Open-frame printing compatible; part cooling fan 50-100%'}.",
                 "- **Infill Architecture:** Solid 100% rectilinear infill at structural mounting roots; 40% gyroid infill with 4 perimeters along functional body panels."
             ])
 

@@ -255,24 +255,26 @@ class RAGEngine:
         scored_chunks.sort(key=lambda x: x["score"], reverse=True)
         return scored_chunks[:top_k]
 
-    def build_augmented_prompt(self, user_query: str, engineering_spec: Dict[str, Any], top_k: int = 4) -> str:
+    def build_augmented_prompt(self, user_query: str, engineering_spec: Dict[str, Any], top_k: int = 4, retrieved_chunks: Optional[List[Dict[str, Any]]] = None) -> str:
         """
         Synthesize retrieved engineering context, physical boundary conditions,
         and strict system instructions for LLM generation.
+        Accepts either an explicit list of retrieved chunks or an integer top_k.
         """
-        # Formulate rich targeted retrieval query
-        retrieval_query = f"{user_query} {engineering_spec.get('synthesized_engineering_spec', {}).get('component_classification', '')} " \
-                          f"{engineering_spec.get('boundary_conditions_and_constraints', {}).get('manufacturing_process', '')} " \
-                          f"{'water saturation hydrolysis degradation' if engineering_spec.get('boundary_conditions_and_constraints', {}).get('submerged_aquatic_exposure') else ''} " \
-                          f"{'hydrodynamic surface roughness epoxy drag penalty' if engineering_spec.get('boundary_conditions_and_constraints', {}).get('submerged_aquatic_exposure') else ''}"
-
-        retrieved_chunks = self.query(retrieval_query, top_k=top_k)
+        if retrieved_chunks is not None:
+            chunks = retrieved_chunks
+        elif isinstance(top_k, list):
+            chunks = top_k
+        else:
+            retrieval_query = f"{user_query} {engineering_spec.get('synthesized_engineering_spec', {}).get('component_classification', '')} " \
+                              f"{engineering_spec.get('boundary_conditions_and_constraints', {}).get('manufacturing_process', '')}"
+            chunks = self.query(retrieval_query, top_k=top_k)
 
         mfg_process = engineering_spec.get('boundary_conditions_and_constraints', {}).get('manufacturing_process', '').lower()
         is_fdm_route = ('fdm' in mfg_process or 'additive' in mfg_process)
         
         context_blocks = []
-        for i, chunk in enumerate(retrieved_chunks, 1):
+        for i, chunk in enumerate(chunks, 1):
             source = chunk["metadata"].get("document_title", "Engineering Knowledge Base").lower()
             if not is_fdm_route and ("fdm" in source or "additive" in source):
                 continue # Filter out FDM chunks for CNC/Subtractive components

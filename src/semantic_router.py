@@ -7,6 +7,7 @@ def ollama_semantic_classifier(prompt: str) -> Optional[str]:
     """
     Uses the local Ollama LLM to semantically classify the user's prompt 
     into our strict Ashby engineering categories without relying on hardcoded regex.
+    Configured with low-latency constraints (num_predict: 20, 3s timeout).
     """
     categories = [
         "aerospace_airframe_or_drone",
@@ -62,6 +63,13 @@ Respond with ONLY the exact string of the category. Do not add any other words o
             "prompt": f"User part: {prompt}",
             "system": system_prompt,
             "stream": False,
+            "keep_alive": "15m",
+            "options": {
+                "num_predict": 20,
+                "temperature": 0.0,
+                "num_ctx": 512,
+                "num_thread": 4
+            }
         }).encode("utf-8")
         
         base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
@@ -70,7 +78,7 @@ Respond with ONLY the exact string of the category. Do not add any other words o
             data=req_data,
             headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=300.0) as response:
+        with urllib.request.urlopen(req, timeout=3.0) as response:
             result = json.loads(response.read().decode("utf-8"))
             answer = result.get("response", "").strip()
             

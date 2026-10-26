@@ -50,15 +50,33 @@ class EngineeringReportGenerator:
         for i, m in enumerate(ranked[:6], 1):
             report += f"| {i} | {m['name']} | {m['family']} | {m['final_metric']:.2f} | {m['density_g_cm3']:.2f} | {m['youngs_modulus_gpa']:.1f} | {m['yield_strength_mpa']:.1f} | ${m['cost_usd']:.2f} |\n"
 
+        if leaderboard:
+            report += "\n---\n\n## 3. Techno-Economic Procurement & Supply Chain Analysis (Incoterms 2020 DDP Nairobi)\n\n"
+            report += "| Rank | Candidate Material | Sourcing Origin | Lead Time (Days) | Landed DDP ($/kg) | Kraljic Matrix | Wilson EOQ (kg) | TOPSIS Closeness ($C_i^*$) |\n"
+            report += "| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: |\n"
+            for row in leaderboard[:6]:
+                econ = row.get("economics", {})
+                eoq_data = econ.get("eoq", {})
+                kraljic_data = econ.get("kraljic_portfolio", {})
+                lead_data = econ.get("safety_stock_analysis", {})
+                origin_name = econ.get("sourcing_category", "Global Stock")
+                lead_days = econ.get("lead_time_days", 30.0)
+                ss_kg = lead_data.get("safety_stock_kg", 0.0)
+                landed_cost = econ.get("landed_cost_usd_per_kg", 0.0)
+                kraljic_quad = kraljic_data.get("quadrant", "Standard")
+                eoq_kg = eoq_data.get("effective_order_quantity_kg", 0.0)
+                topsis_score = row.get("topsis_closeness_score", 0.0)
+                report += f"| {row.get('overall_rank', '-')} | {row.get('name', 'N/A')} | {origin_name} | {lead_days:.0f}d (SS: {ss_kg:.1f}kg) | ${landed_cost:.2f} | {kraljic_quad} | {eoq_kg:.0f} kg | {topsis_score:.4f} |\n"
+
         report += fr"""
 ---
 
-## 3. Synthesized Technical Engineering Recommendation
+## 4. Synthesized Technical Engineering Recommendation
 {analysis_result.get('synthesized_response')}
 
 ---
 
-## 4. Empirical Mechanical Properties & Data Provenance
+## 5. Empirical Mechanical Properties & Data Provenance
 For the top-ranked candidate **{top_mat['name'] if top_mat else 'N/A'}**:
 - **Yield Strength ($\sigma_y$):** {top_mat['yield_strength_mpa'] if top_mat else 'N/A'} MPa
 - **Density ($\rho$):** {top_mat['density_g_cm3'] if top_mat else 'N/A'} g/cm³

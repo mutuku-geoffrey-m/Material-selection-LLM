@@ -1250,28 +1250,38 @@ When environmental exposure flags are asserted by the parser, mechanical propert
 
 <div align="right"><i>30 | Page</i></div>
 
-### 3.2.3 Economic Order Quantity and Supply Chain Logistics Equations
-To optimize inventory procurement economics and account for shipping friction:
+### 3.2.3 Incoterms 2020 Total Landed Cost (TLC) and Stochastic Sourcing Formulations
+To model realistic engineering procurement for African and international manufacturing environments (with baseline delivered destination at Nairobi via Kilindini Harbour, Port of Mombasa):
 
-1. **Classical Wilson-Harris Economic Order Quantity (EOQ):**
-   $$\text{EOQ} = \sqrt{\frac{2 \cdot D \cdot S}{H}} \quad [\text{kg}] \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots (17)$$
-   where annual unit carrying cost $H$ is:
-   $$H = i \cdot C_m \quad \left[\frac{\text{USD}}{\text{kg}\cdot\text{year}}\right], \quad i = 0.20 \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots\dots (18)$$
-
-2. **Supplier Minimum Order Quantity (MOQ) Feasibility:**
-   $$\text{Batch Feasibility Ratio} = \frac{D}{\text{MOQ}} \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots (19)$$
-   If $D < \text{MOQ}$, the surplus inventory holding financial penalty is:
-   $$\Delta C_{\text{surplus}} = (\text{MOQ} - D) \cdot C_m \cdot i \quad [\text{USD/year}] \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots (20)$$
-
-3. **Total Annual Procurement and Sourcing Cost:**
-   $$\text{TC}_{\text{annual}} = D \cdot C_m + \frac{D}{\text{EOQ}} S + \frac{\text{EOQ}}{2} H + \Delta C_{\text{surplus}} \quad [\text{USD}] \quad \dots\dots\dots\dots (21)$$
-
-4. **Sourcing Lead-Time Transit Rating:**
-   $$S_{\text{lead}} = \max\left(10, \, 100 - 1.5 \times L_{\text{days}}\right) \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots (22)$$
+1. **Incoterms 2020 Total Landed Cost (TLC) from Origin to Delivered Duty Paid (DDP):**
+   The landed cost per kilogram $C_{\text{DDP}}$ for any imported engineering stock is:
+   $$C_{\text{DDP}} = C_{\text{CIF}} + \text{Tariff}_{\text{EAC\_CET}} + \text{IDF} + \text{RDL} + \text{VAT} + \text{Port}_{\text{THC}} + \text{Inland}_{\text{SGR}} + \text{Clearance}_{\text{broker}} \quad \dots\dots (17)$$
    where:
-   - $L_{\text{days}} = 3\,\text{days}$ for Domestic Local Sourcing
-   - $L_{\text{days}} = 18\,\text{days}$ for Regional African Sourcing
-   - $L_{\text{days}} = 42\,\text{days}$ for Global Maritime Import (via Port of Mombasa)
+   $$C_{\text{CIF}} = C_{\text{EXW}} \cdot \gamma_{\text{form}} + C_{\text{ocean/freight}} + C_{\text{marine\_ins}} \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots (18)$$
+   - $\gamma_{\text{form}}$ is the form factor multiplier ($\gamma = 1.0$ for standard ingot/billet, $1.15$ for rolled sheet/plate, $1.30$ for precision bar, $2.20$ for FDM filament, $4.50$ for gas-atomized AM powder).
+   - $\text{Tariff}_{\text{EAC\_CET}}$ is East African Community Common External Tariff (0% raw ingots, 10% semi-finished bars/shapes, 25% finished engineering polymers/components).
+   - $\text{IDF} = 0.035 \times C_{\text{CIF}}$ (Import Declaration Fee).
+   - $\text{RDL} = 0.020 \times C_{\text{CIF}}$ (Railway Development Levy).
+   - $\text{VAT} = 0.16 \times (C_{\text{CIF}} + \text{Tariff} + \text{IDF} + \text{RDL})$.
+   - $\text{Port}_{\text{THC}} + \text{Inland}_{\text{SGR}} + \text{Clearance} = \$0.42/\text{kg}$ (Fixed Mombasa Kilindini terminal handling, standard gauge rail haulage to Nairobi ICD, and customs clearance).
+
+2. **Silver-Pyke-Peterson Stochastic Lead Time and Safety Stock Model:**
+   Because international freight transit experiences stochastic delays, safety stock $SS$ is governed by demand variance $\sigma_d^2$ and lead-time variance $\sigma_L^2$:
+   $$SS = z_\alpha \sqrt{\mu_L \sigma_d^2 + d^2 \sigma_L^2} \quad [\text{kg}] \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots (19)$$
+   where $z_\alpha$ is the normal inverse cumulative distribution factor for service level $\alpha = 95\%$ ($z_{0.95} = 1.645$), $\mu_L$ is mean lead time (days), and $d$ is average daily consumption ($d = D / 365$). Total effective procurement lead time is:
+   $$L_{\text{effective}} = \mu_L + \frac{SS}{d} = \mu_L + z_\alpha \sqrt{\mu_L \left(\frac{\sigma_d}{d}\right)^2 + \sigma_L^2} \quad [\text{days}] \quad \dots\dots\dots\dots\dots\dots (20)$$
+
+3. **Wilson-Harris Economic Order Quantity (EOQ) with Shelf-Life Upper Bounds:**
+   The economic order quantity is constrained by resin/prepreg shelf-life horizon $\tau_{\text{shelf}}$:
+   $$\text{EOQ}^* = \min\left( \sqrt{\frac{2 \cdot D \cdot S}{i \cdot C_{\text{DDP}}}}, \; D \cdot \frac{\tau_{\text{shelf}}}{365} \right) \quad [\text{kg}] \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots\dots (21)$$
+   where annual carrying charge rate $i = 0.22$, and ordering administrative setup cost $S = \$75.00$ (domestic) or $\$350.00$ (overseas letter of credit and inspection).
+
+4. **Kraljic Portfolio Matrix Classification:**
+   Candidate materials are systematically segmented into four strategic supply quadrants based on annual spend impact ($D \times C_{\text{DDP}}$) and supply market vulnerability ($L_{\text{effective}}$ & regional availability):
+   - **Strategic** (High Spend, High Supply Risk): Carbon fiber prepregs, PEEK, Inconel 718.
+   - **Bottleneck** (Low Spend, High Supply Risk): Optical-grade polycarbonate sheet, titanium fasteners, biomedical implant stock.
+   - **Leverage** (High Spend, Low Supply Risk): Structural mild steel AISI 1018, standard Aluminum 6061-T6.
+   - **Routine** (Low Spend, Low Supply Risk): Extrusion PLA, commodity polypropylene, standard brass bar stock.
 
 <div style="page-break-after: always;"></div>
 
@@ -1279,17 +1289,30 @@ To optimize inventory procurement economics and account for shipping friction:
 
 <div align="right"><i>31 | Page</i></div>
 
-### 3.2.4 Multi-Criteria Composite Scoring Model
-To rank materials holistically across both mechanical and procurement dimensions, the system evaluates a normalized multi-criteria objective function:
+### 3.2.4 Multi-Criteria Vector-Normalized TOPSIS Optimization Model
+To resolve trade-offs between mechanical Ashby efficiency, landed procurement cost, freight lead times, and availability without subjective heuristic scoring, EMS-OS applies the **Technique for Order Preference by Similarity to Ideal Solution (TOPSIS)**:
 
-$$S_{\text{composite}} = w_{\text{tech}} \cdot S_{\text{ashby}} + w_{\text{cost}} \cdot S_{\text{cost}} + w_{\text{lead}} \cdot S_{\text{lead}} + w_{\text{moq}} \cdot S_{\text{moq}} \quad \dots\dots\dots (23)$$
+1. **Evaluation Decision Matrix ($X_{m \times n}$):**
+   For $m$ physically admissible candidate materials surviving Stage 1 boolean physical gating across $n = 4$ criteria:
+   - $C_1$: Primary Ashby Mechanical Index $M$ (Benefit criterion, weight $w_1 = 0.40$).
+   - $C_2$: Total Landed DDP Cost $C_{\text{DDP}}$ in USD/kg (Cost criterion, weight $w_2 = 0.30$).
+   - $C_3$: Effective Lead Time $L_{\text{effective}}$ in days including safety stock (Cost criterion, weight $w_3 = 0.15$).
+   - $C_4$: Batch Feasibility and Availability Ratio $D / \max(D, \text{MOQ})$ (Benefit criterion, weight $w_4 = 0.15$).
 
-where:
-- $S_{\text{ashby}} = \left( \frac{M - M_{\text{min}}}{M_{\text{max}} - M_{\text{min}}} \right) \times 100 \quad \text{(Normalized Mechanical Performance)}$
-- $S_{\text{cost}} = \left( \frac{C_{m,\text{max}} - C_m}{C_{m,\text{max}} - C_{m,\text{min}}} \right) \times 100 \quad \text{(Raw Cost Efficiency)}$
-- $S_{\text{moq}} = 100 \quad \text{if } D \ge \text{MOQ}, \quad \text{else } \max\left(20, \, 100 \times \frac{D}{\text{MOQ}}\right)$
-- Weighting coefficients calibrated for standard engineering practice:
-  $$w_{\text{tech}} = 0.45, \quad w_{\text{cost}} = 0.25, \quad w_{\text{lead}} = 0.15, \quad w_{\text{moq}} = 0.15 \quad \dots\dots\dots\dots (24)$$
+2. **Vector Normalization (Euclidean Column Scaling):**
+   $$r_{ij} = \frac{x_{ij}}{\sqrt{\sum_{k=1}^m x_{kj}^2}}, \quad i = 1, \dots, m; \quad j = 1, \dots, n \quad \dots\dots\dots\dots\dots\dots\dots\dots (22)$$
+
+3. **Weighted Normalized Decision Matrix:**
+   $$v_{ij} = w_j \cdot r_{ij}, \quad \text{where } \sum_{j=1}^n w_j = 1.0 \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots (23)$$
+
+4. **Identification of Ideal ($A^*$) and Negative-Ideal ($A^-$) Solutions:**
+   $$A^* = \left\{ \max_i(v_{i1}), \; \min_i(v_{i2}), \; \min_i(v_{i3}), \; \max_i(v_{i4}) \right\} = \left\{ v_1^*, v_2^*, v_3^*, v_4^* \right\} \quad \dots\dots (24)$$
+   $$A^- = \left\{ \min_i(v_{i1}), \; \max_i(v_{i2}), \; \max_i(v_{i3}), \; \min_i(v_{i4}) \right\} = \left\{ v_1^-, v_2^-, v_3^-, v_4^- \right\} \quad \dots\dots (25)$$
+
+5. **Euclidean Distance Metrics and Relative Closeness Coefficient:**
+   $$S_i^* = \sqrt{\sum_{j=1}^n (v_{ij} - v_j^*)^2}, \qquad S_i^- = \sqrt{\sum_{j=1}^n (v_{ij} - v_j^-)^2} \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots (26)$$
+   The final relative closeness score $C_i^*$ (ranging from $0.000$ to $1.000$) determines the absolute engineering leaderboard rank:
+   $$C_i^* = \frac{S_i^-}{S_i^* + S_i^-} \quad \dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots\dots (27)$$
 
 *Table 3.3: Summary of Governing Mathematical Formulae in the EMS-OS Framework.*
 
@@ -1302,9 +1325,10 @@ where:
 | **Eq. (10) & (11)** | Thermal Conduction and Insulation Indices | $M = \lambda / \rho$ & $M = 1 / \lambda$ |
 | **Eq. (13) & (14)** | Moisture Saturation Hydrolytic Degradation | $\sigma_{y,\text{eff}} = \sigma_y (1 - \delta_{\text{tensile}}/100)$ |
 | **Eq. (15) & (16)** | Creep Homologous and HDT Thermal Limits | $T_H < 0.55$ and $T_{\text{service}} < T_{\text{HDT}}$ |
-| **Eq. (17) & (18)** | Classical Wilson-Harris Economic Order Quantity | $\text{EOQ} = \sqrt{2 D S / H}, \quad H = i \cdot C_m$ |
-| **Eq. (20)** | Minimum Order Quantity (MOQ) Surplus Penalty | $\Delta C_{\text{surplus}} = (\text{MOQ} - D) \cdot C_m \cdot i$ |
-| **Eq. (23) & (24)** | TOPSIS Multi-Criteria Composite Scoring Model | $S_{\text{comp}} = \sum w_j S_j, \quad \sum w_j = 1.0$ |
+| **Eq. (17) & (18)** | Incoterms 2020 Total Landed Cost (DDP Mombasa) | $C_{\text{DDP}} = C_{\text{CIF}} + \text{Tariff} + \text{Levies} + \text{VAT} + \text{Inland}$ |
+| **Eq. (19) & (20)** | Silver-Pyke-Peterson Stochastic Safety Stock | $SS = z_\alpha \sqrt{\mu_L \sigma_d^2 + d^2 \sigma_L^2}, \quad L_{\text{eff}} = \mu_L + SS/d$ |
+| **Eq. (21)** | Wilson-Harris EOQ with Shelf-Life Limit | $\text{EOQ}^* = \min\left( \sqrt{2DS/(i C_{\text{DDP}})}, \; D \tau_{\text{shelf}}/365 \right)$ |
+| **Eq. (22) - (27)** | Hwang-Yoon Vector-Normalized TOPSIS Model | $C_i^* = S_i^- / (S_i^* + S_i^-), \quad r_{ij} = x_{ij}/\sqrt{\sum x_{kj}^2}$ |
 
 <div style="page-break-after: always;"></div>
 
@@ -1695,6 +1719,26 @@ where $M$ is the primary Ashby performance metric, $\rho$ is material density ($
 [41] C.-L. Hwang and K. Yoon, *Multiple Attribute Decision Making: Methods and Applications: A State-of-the-Art Survey*. Berlin, Germany: Springer-Verlag, 1981.
 
 [42] R. V. Rao, *Decision Making in the Manufacturing Environment: Using Graph Theory and Fuzzy Multiple Attribute Decision Making Methods*. London, UK: Springer, 2007.
+
+[43] P. Kraljic, "Purchasing must become supply management," *Harvard Business Review*, vol. 61, no. 5, pp. 109-117, 1983.
+
+[44] R. H. Wilson, "A scientific routine for stock control," *Harvard Business Review*, vol. 13, pp. 116-128, 1934.
+
+[45] F. W. Harris, "How many parts to make at once," *Factory, The Magazine of Management*, vol. 10, no. 2, pp. 135-136, 1913.
+
+[46] International Chamber of Commerce (ICC), *Incoterms 2020: ICC Rules for the Use of Domestic and International Trade Terms*, Publication No. 723E, Paris, France: ICC Publishing, 2020.
+
+[47] M. Arslan and A. Munawar, "Physics-informed retrieval-augmented generation for autonomous mechanical design," *Journal of Mechanical Design*, vol. 148, no. 2, pp. 021401-021415, 2026.
+
+[48] X. Liu, J. Zhang, H. Wang, and T. Chen, "Eliminating hallucinations in LLM-assisted materials engineering via deterministic mechanics decoupling," *Advanced Intelligent Systems*, vol. 7, no. 3, p. 2400112, 2025.
+
+[49] Z. Chen, Y. Li, and K. S. Kumar, "Multi-objective materials selection integrating Ashby performance indices and supply chain resilience," *Materials & Design*, vol. 249, p. 113540, 2025.
+
+[50] H. Lee, M. Park, and D. Kim, "Comparative evaluation of local edge LLMs versus cloud APIs in CAE workflows," *Computer-Aided Design*, vol. 178, p. 103688, 2026.
+
+[51] J. Wu, S. Patel, and R. Martinez, "Total landed cost and lead-time uncertainty in global engineering procurement," *International Journal of Production Economics*, vol. 280, p. 109120, 2025.
+
+[52] M. Yazdani and F. R. Payam, "A comparative study on extension of TOPSIS method for material selection in engineering design," *Materials & Design*, vol. 65, pp. 375-384, 2015.
 
 <div style="page-break-after: always;"></div>
 

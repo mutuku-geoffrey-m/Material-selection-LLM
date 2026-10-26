@@ -234,6 +234,7 @@ def rank_materials(
     balloon_tether: bool = False,
     battery_shield: bool = False,
     machine_spindle: bool = False,
+    non_magnetic_required: bool = False,
     prompt_text: str = ""
 ) -> List[Dict[str, Any]]:
     """
@@ -357,6 +358,16 @@ def rank_materials(
             # Dental molar crown: continuous fiber composite is non-biocompatible in oral cavity
             if dental_prosthetic and mat.get("family") == "Continuous Fiber Composite":
                 continue
+
+        # Check MRI Non-Magnetic Safety Filter (Disqualify ferromagnetic alloys)
+        if non_magnetic_required or "mri" in prompt_lower:
+            fam = mat.get("family", "")
+            if ("Steel" in fam or "Ferrous" in fam or "Iron" in fam) and ("316L" not in mat_key and "Austenitic" not in fam):
+                continue
+
+        # Check Chemical & Coolant Corrosion Filter (Disqualify reactive Magnesium in coolants/chemicals)
+        if (chemical_exposure or "coolant" in prompt_lower) and ("Magnesium" in mat.get("family", "") or "Magnesium" in mat.get("name", "")):
+            continue
 
         mat_eval = dict(mat)
 

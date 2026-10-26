@@ -632,12 +632,12 @@ with col_left:
             if env_uv:
                 nlp_spec["boundary_conditions_and_constraints"]["outdoor_solar_uv_exposure"] = True
 
-            # 2. Retrieve Verified RAG Chunks
+            # 2. Retrieve Verified RAG Chunks (Single Query Optimization)
             retrieved_chunks = rag_engine.query(user_prompt, top_k=4)
             rag_prompt = rag_engine.build_augmented_prompt(
                 user_query=user_prompt,
                 engineering_spec=nlp_spec,
-                top_k=4
+                retrieved_chunks=retrieved_chunks
             )
 
             # 3. Execute Orchestrator Pipeline
@@ -834,22 +834,37 @@ with col_right:
 
             leaderboard = res.get("techno_economic_leaderboard", [])
             if leaderboard:
-                df_econ = pd.DataFrame([
-                    {
+                econ_rows = []
+                for item in leaderboard[:10]:
+                    econ = item["economics"]
+                    eoq = econ.get("eoq", {})
+                    landed = econ.get("landed_cost_breakdown", {})
+                    kraljic = econ.get("kraljic_portfolio", {})
+                    ss = econ.get("safety_stock_analysis", {})
+                    
+                    exw = landed.get("incoterm_exw_usd_kg", econ.get("raw_cost_usd_per_kg", 0.0))
+                    ddp = landed.get("incoterm_ddp_usd_kg", econ.get("landed_cost_usd_per_kg", exw))
+                    origin = landed.get("origin_key", econ.get("sourcing_category", "Global"))
+                    lead = econ.get("lead_time_days", 14)
+                    ss_kg = ss.get("safety_stock_kg", 0.0)
+                    quad = kraljic.get("quadrant", "Routine")
+                    moq = econ.get("minimum_order_quantity_kg", 25.0)
+                    eff_eoq = eoq.get("effective_order_quantity_kg", eoq.get("eoq_batch_size_kg", 50.0))
+                    score = item.get("composite_score", 0.0)
+
+                    econ_rows.append({
                         "Rank": f"#{item['overall_rank']}",
                         "Material Grade": item["name"],
                         "Family": item["family"],
                         "Ashby Index": f"{item['technical_ashby_score']:.2f}",
-                        "Cost ($/kg)": f"${item['economics']['raw_cost_usd_per_kg']:.2f}",
-                        "Sourcing Tier": item['economics']['sourcing_category'],
-                        "Lead Time": f"{item['economics']['lead_time_days']} d",
-                        "MOQ": f"{item['economics']['minimum_order_quantity_kg']:.0f} kg",
-                        "EOQ Batch": f"{item['economics']['eoq']['eoq_batch_size_kg']:.0f} kg",
-                        "Composite Score": f"{item['composite_score']:.1f}/100"
-                    }
-                    for item in leaderboard[:8]
-                ])
-                st.dataframe(df_econ, use_container_width=True, hide_index=True)
+                        "Cost (EXW / DDP)": f"${exw:.2f} / ${ddp:.2f}",
+                        "Sourcing Origin": origin,
+                        "Lead Time": f"{lead:.0f}d (SS: {ss_kg:.1f}kg)",
+                        "Kraljic Quadrant": quad,
+                        "MOQ / EOQ": f"{moq:.0f}kg / {eff_eoq:.0f}kg",
+                        "TOPSIS Score": f"{score:.1f}/100"
+                    })
+                st.dataframe(pd.DataFrame(econ_rows), use_container_width=True, hide_index=True)
 
         with tab4:
             st.markdown("""

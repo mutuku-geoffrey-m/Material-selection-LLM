@@ -179,7 +179,7 @@ class NLPTranslationLayer:
             component_type = "structural_hardware_or_pivot"
         elif any(w in prompt_lower for w in ["support beam", "pipe support", "cantilever beam", "beam", " arm", "lever", "cantilever", "bracket", "mount", "mounting bracket", "solar bracket", "joist", "deck joist", "boom", "gantry boom", "strut", "hydrofoil", "spar", "cantilever strut"]):
             component_type = "structural_cantilever_beam"
-        elif any(w in prompt_lower for w in ["broken pipe", "plumbing", "water pipe", "drain pipe", "fluid tube", "conduit"]) or ("pipe" in prompt_lower and not any(p in prompt_lower for p in ["phone", "heat pipe", "support", "beam", "cantilever"])):
+        elif any(w in prompt_lower for w in ["broken pipe", "plumbing", "water pipe", "drain pipe", "fluid tube", "conduit", "tubing", "coolant tubing", "coolant hose", "coolant line", "hose", "coolant pipe"]) or ("pipe" in prompt_lower and not any(p in prompt_lower for p in ["phone", "heat pipe", "support", "beam", "cantilever"])):
             component_type = "fluid_conduit_plumbing"
         elif any(w in prompt_lower for w in ["chair", "table", "desk", "stool", "bench", "shelf", "shelving", "bed frame", "furniture", "bookcase"]):
             component_type = "structural_furniture_or_load_frame"
@@ -264,8 +264,9 @@ class NLPTranslationLayer:
             "hcl", "h2so4", "bleach liquor", "hot bleach", "acid vapor", "acid bath", "caustic", "acid drum"
         ])
         is_chem_exposure = is_strong_acid or any(w in prompt_lower for w in [
-            "acid", "chemical", "salt", "saline", "seawater", "saltwater", "corrosive", "oil", "fuel", "petrol", "ocean", "marine"
+            "acid", "chemical", "salt", "saline", "seawater", "saltwater", "corrosive", "oil", "fuel", "petrol", "ocean", "marine", "coolant", "cutting fluid", "emulsion"
         ])
+        is_mri_compatible = any(w in prompt_lower for w in ["mri", "magnetic resonance", "magnetic field", "non-magnetic", "nonmagnetic"])
         is_marine_industrial = any(w in prompt_lower for w in [
             "submarine", "deep ocean", "300 bar", "wellhead", "2000m", "offshore", "desalination", "reverse osmosis",
             "trawler", "hydrofoil", "commercial fishing", "marine port", "subsea", "trenching", "saline"
@@ -584,6 +585,7 @@ class NLPTranslationLayer:
                 "food_contact_safe": is_food,
                 "rapid_prototyping_priority": is_rapid,
                 "optical_transparency_required": is_optical,
+                "non_magnetic_required": is_mri_compatible,
                 "cutting_edge_hardness_required": is_cutting,
                 "biocompatible_implant_required": is_biomed,
                 "hardened_steel_nozzle_acceptable": fdm_only_preference,
