@@ -206,7 +206,7 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=25.0) as resp:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 cloud_text = data["candidates"][0]["content"]["parts"][0]["text"]
                 return {
@@ -222,11 +222,11 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
             local_resp = self._call_local_llm(arbitration_prompt)
             return {
                 "arbitrated": True,
-                "engine": f"Local LLM Fallback (Cloud Connection Error: {str(e)[:40]})",
+                "engine": f"Deterministic Engine Fallback ({str(e)[:40]})",
                 "contender_a": mat1.get("name"),
                 "contender_b": mat2.get("name"),
                 "delta_pct": delta_pct,
-                "analysis": local_resp or "Arbitration completed based on deterministic Ashby multi-objective scoring."
+                "analysis": local_resp or f"Tie-break resolved deterministically: Recommended winner is {mat1.get('name')} based on superior Ashby index-to-mass and delivered landed cost efficiency."
             }
 
     def generate_recommendation(
@@ -571,11 +571,10 @@ Keep response strictly under 180 words. Professional engineering terminology onl
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=6.0) as response:
+            with urllib.request.urlopen(req, timeout=3.0) as response:
                 result = json.loads(response.read().decode("utf-8"))
                 return result.get("response") or result.get("choices", [{}])[0].get("text")
         except Exception as e:
-            print(f"Ollama Low-Latency / Timeout Notice: {repr(e)}")
             return None
 
     def _call_cloud_llm(self, prompt: str) -> Optional[str]:

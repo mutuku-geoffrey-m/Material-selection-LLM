@@ -180,7 +180,86 @@ python cli.py --prompt "Submarine front transparent shield requiring high hydros
 
 ---
 
-## 6. Citation
+## 6. Workbench User Manual & Exploration Guide
+
+The EMS-OS workbench is designed to be **fully open-ended**. While pre-configured benchmark examples are provided in the drop-down menu for convenience, you are encouraged to enter **any custom mechanical engineering design brief** into the console.
+
+### 6.1 Formulating an Open-Ended Technical Prompt
+
+For the natural language translation layer to extract accurate boundary conditions and continuum mechanics parameters, formulate your brief including one or more of the following aspects:
+
+1. **Component Type & Function:** What part is being engineered?
+   - *Examples:* Cantilever beam, pressure vessel, high-speed spindle, drone arm, connecting rod, heat exchanger, turbine blade, gear, spring, or prosthetic implant.
+2. **Primary Loading Mode / Stress State:** What physical forces act on the part?
+   - *Tension / Tie:* Axial stretching, burst hoop stress in thin cylinders ($M = \sigma_y / \rho$ or $M = E / \rho$).
+   - *Bending:* Cantilever or supported beam deflection ($M = E^{1/2} / \rho$) or plastic collapse ($M = \sigma_y^{2/3} / \rho$).
+   - *Plate Out-of-Plane Bending:* Panels, bulkheads, car body panels ($M = E^{1/3} / \rho$ or $M = \sigma_y^{1/2} / \rho$).
+   - *Torsion:* Shafts, couplings, drill strings ($M = G^{1/2} / \rho$).
+   - *Elastic Energy Storage:* Helical or leaf springs ($M = \sigma_y^2 / E$).
+   - *Thermal Conduction:* Heat sinks, cooling fins ($M = \lambda / \rho$).
+3. **Environmental & Thermal Constraints:** Where does the part operate?
+   - Temperature ranges (e.g. *cryogenic -196 °C, ambient, or high temperatures > 400 °C*).
+   - Fluid exposure (e.g. *submerged in river sediment, marine saline water, industrial cutting fluids, acids, or vacuum*).
+4. **Manufacturing Process:**
+   - Universal search across all 1,490+ materials (metals, polymers, composites, ceramics) or restricted to *FDM Additive Manufacturing* filaments or *CNC Machining*.
+5. **Governing Standards (Optional):**
+   - E.g. *ASTM E466, ASTM A36, ISO 527, ASME Section VIII*.
+
+### 6.2 Navigating the User Interface
+
+The workbench interface is split into two primary panels:
+
+#### Left Panel: Design Specification & Boundary Sizing
+- **In-App User Manual (Collapsible):** Click to review operating instructions directly within the UI.
+- **Standard Benchmark Library:** An optional drop-down containing calibrated engineering baselines. Selecting any preset automatically loads its brief into the text box. Choosing *Custom Specification (Blank)* clears the input for fresh entries.
+- **Technical Engineering Design Brief:** An open-ended multi-line input where you type or edit your mechanical requirements.
+- **Manufacturing Route:**
+  - *Universal Multi-Process:* Evaluates all material families (structural steels, titanium, aluminum alloys, engineering polymers, continuous and short-fiber composites, and technical ceramics).
+  - *FDM Additive Only:* Restricts candidate search to 3D printable filament grades (PETG-CF, PEEK, ASA, PLA, PA12-CF, TPU).
+- **Annual Production Demand (kg):** Enter the estimated annual project consumption (e.g., 500 kg, 2,500 kg, 10,000 kg). The engine uses this to calculate Wilson-Harris Economic Order Quantities (EOQ) and evaluate supplier Minimum Order Quantity (MOQ) holding penalties.
+- **Operational Environmental Kinetics:** Checkboxes to quickly flag specific service hazards (Submerged Hydrolysis, Cryogenic Thermal, Outdoor UV, High-Temp Flash, Vacuum Outgassing).
+- **Inference Route (Sidebar):** Select between:
+  - *Local Standalone LLM (llama3.2 via Ollama):* Local generative synthesis with verified ground-truth bounds.
+  - *Deterministic Continuum Mechanics Solver [Fast < 0.2s]:* Pure mathematical physics and metallurgical evaluation with zero network latency.
+  - *Cloud API (Google Gemini):* Cloud reasoning mode.
+- **Execute Button:** Click **"Execute Screening & Optimization"** to launch the analysis.
+
+#### Right Panel: Multi-Objective Analysis & Sizing
+Once executed, the right panel populates with comprehensive engineering diagnostics:
+- **Governing Material Banner:** Highlights the #1 optimal material, its material family, governing Ashby index, and key mechanical constants (yield strength $\sigma_y$, Young's modulus $E$, density $\rho$).
+- **Interactive Log-Log Ashby Chart:** Generates an interactive Plotly property space chart ($E$ vs. $\rho$, $\sigma_y$ vs. $\rho$, or thermal conductivity vs. density) plotting the material universe with the theoretical Ashby selection guide line. Hover over any bubble to inspect mechanical properties.
+- **Incoterms 2020 Sourcing & Landed Cost Breakdown:** A multi-column procurement table displaying Ex Works (EXW) price, Delivered Duty Paid (DDP) cost to Nairobi via Kilindini Harbour (Mombasa), customs tariffs (EAC CET), freight lead times, buffer safety stock, and Kraljic risk quadrant (*Strategic, Bottleneck, Leverage, Routine*).
+- **Technical Dossier:** Displays detailed metallurgical commentary on microstructural trade-offs, operational failure modes (fatigue, creep, galvanic corrosion), and recommended fabrication directives.
+- **Export Report:** Download the verified selection dossier as a clean Markdown report for your design log.
+
+#### Sidebar Utilities
+- **Design Cases Manager:** Create new design cases with **"+ New Design Case"** or switch between previous cases. Each case preserves its own independent prompt, inputs, and results.
+- **Material Database Inspector:** Select any material from the 1,490-grade database to inspect its standardized mechanical properties, thermal limits, and raw cost.
+
+### 6.3 Sample Open-Ended Prompts to Try
+
+Copy and paste any of the following open-ended technical briefs into the text area to test different physics engines:
+
+```text
+1. Drone Arm (Aerospace / Flexural Stiffness):
+"Design a lightweight cantilever arm for an autonomous agricultural drone carrying a 5 kg sensor payload under high wind gusts. Must maximize flexural bending stiffness per unit mass while resisting outdoor solar UV radiation."
+
+2. Geothermal Valve Body (High-Temperature & Corrosive Media):
+"Valving body for an Olkaria geothermal brine extraction line operating at 320 C and 40 bar pressure. Must resist hot saline sulfide stress corrosion cracking, prevent catastrophic thermal creep rupture, and conform to ASME Section VIII."
+
+3. Marine Propeller Hub (Hydrodynamic Cavitation & Saline Immersion):
+"High-speed marine vessel propeller hub operating continuously in coastal seawater under cyclic torsional shear stress at 2,800 RPM. Requires high shear modulus G > 40 GPa, immunity to pitting corrosion, and low galvanic potential."
+
+4. Precision Optical Mirror Bulkhead (Dimensional Stability):
+"Support bulkhead for a high-precision satellite optical camera. Requires near-zero thermal expansion coefficient, maximum specific stiffness E/rho to survive launch acoustic vibration, and zero outgassing in vacuum."
+
+5. Heavy-Duty Truck Suspension Leaf Spring (Elastic Strain Energy):
+"Heavy commercial transport vehicle suspension spring operating over rough gravel roads. Maximize elastic strain energy storage per unit weight (sigma_y^2 / E) while maintaining high fracture toughness and resistance to cyclic fatigue."
+```
+
+---
+
+## 7. Citation
 
 If referencing this project, please cite our technical report using the following IEEE format:
 

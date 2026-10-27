@@ -13,6 +13,8 @@ Design System: Linear & ClickHouse Dark Flat Engineering System
 import os
 import sys
 import uuid
+import json
+import urllib.request
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -377,6 +379,29 @@ st.sidebar.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+@st.cache_data(ttl=25, show_spinner=False)
+def check_cached_ollama_health(endpoint: str, model_name: str) -> dict:
+    try:
+        req = urllib.request.Request(f"{endpoint}/api/tags", headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            models = [m.get("name") for m in data.get("models", [])]
+            return {
+                "online": True,
+                "endpoint": endpoint,
+                "models": models,
+                "target_model_ready": any(model_name in m for m in models)
+            }
+    except Exception as e:
+        return {
+            "online": False,
+            "endpoint": endpoint,
+            "models": [],
+            "target_model_ready": False,
+            "error": str(e)
+        }
+
+
 # Engine Selection
 st.sidebar.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8a8f98; margin-bottom: 6px;'>Inference Daemon Pipeline</div>", unsafe_allow_html=True)
 
@@ -384,6 +409,7 @@ mode_choice = st.sidebar.selectbox(
     "Inference Route",
     [
         "Local Standalone LLM (llama3.2 via Ollama) [Primary]",
+        "Deterministic Physics & Metallurgy Solver [Instant < 0.2s]",
         "Cloud API (Google Gemini / OpenAI)"
     ],
     index=0,
@@ -392,11 +418,13 @@ mode_choice = st.sidebar.selectbox(
 
 mode_map = {
     "Local Standalone LLM (llama3.2 via Ollama) [Primary]": LLMOrchestrator.MODE_LOCAL,
+    "Deterministic Physics & Metallurgy Solver [Instant < 0.2s]": LLMOrchestrator.MODE_AUTONOMOUS_EXPERT,
     "Cloud API (Google Gemini / OpenAI)": LLMOrchestrator.MODE_CLOUD
 }
 
 orchestrator = LLMOrchestrator(mode=mode_map[mode_choice])
-ollama_health = orchestrator.check_ollama_status()
+ollama_endpoint = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+ollama_health = check_cached_ollama_health(ollama_endpoint, orchestrator.local_model)
 
 # Status strip in sidebar
 if ollama_health["online"]:
@@ -555,31 +583,48 @@ with col_left:
         "High-Flux Electronic Heat Sink (250 W)": "High heat flux CPU/IGBT electronic thermal management heat sink dissipating 250 W. Maximize solid Fourier thermal conductivity k and fin efficiency while maintaining low mass."
     }
 
-    selected_preset_key = st.selectbox(
-        "Standard Benchmark Library",
-        list(preset_dict.keys()),
-        index=1 if not current_session["prompt"] else 0,
-        help="Select a calibrated baseline benchmark specification or write custom engineering constraints."
-    )
+    with st.expander("Engineering User Manual & Exploration Guide", expanded=False):
+        st.markdown("""
+        **Welcome to the EMS-OS Materials Optimization Console.** This system is **open-ended**—you can evaluate any custom mechanical design brief or choose a pre-configured engineering benchmark.
+        
+        **How to test and explore:**
+        1. **Enter Your Design Brief:** Type any mechanical specification directly into the **Technical Engineering Design Brief** area below. Include the component function (e.g., *drone arm, pressure pipe, turbine runner*), stress/loading mode (e.g., *bending, tension, torsion, internal burst pressure*), operating environment (*temperatures, water immersion, UV, chemicals*), and any target standards (*ASTM, ISO, ASME*).
+        2. **Use Presets (Optional):** Use the **Benchmark Library** dropdown below to load calibrated baseline test cases (e.g., Cryogenic Dewar Strut, High-Speed Spindle Shaft, Micro-Hydro Blade).
+        3. **Set Parameters:** Choose your manufacturing scope (Universal or FDM 3D printing) and projected annual production demand in kg to evaluate Wilson-Harris batch sizes and local landed costs.
+        4. **Execute Optimization:** Click the **Execute Screening & Optimization** button to run continuum mechanics derivations, database filtering across 1,490+ materials, and techno-economic ranking.
+        """)
 
-    if st.session_state.get("last_selected_preset") != selected_preset_key:
-        st.session_state["last_selected_preset"] = selected_preset_key
-        if selected_preset_key in preset_dict and selected_preset_key != "Custom Specification (Blank)":
-            current_session["prompt"] = preset_dict[selected_preset_key]
-            current_session["title"] = selected_preset_key.split("(")[0].strip()
-            st.rerun()
-        elif selected_preset_key == "Custom Specification (Blank)":
-            current_session["prompt"] = ""
-            current_session["title"] = "Custom Design Case"
-            st.rerun()
+    prompt_state_key = f"prompt_input_{st.session_state.active_session_id}"
+    if prompt_state_key not in st.session_state:
+        st.session_state[prompt_state_key] = current_session.get("prompt", "")
+
+    def on_preset_select():
+        chosen = st.session_state.get(f"preset_sel_{st.session_state.active_session_id}")
+        if chosen and chosen in preset_dict:
+            if chosen == "Custom Specification (Blank)":
+                st.session_state[prompt_state_key] = ""
+                current_session["prompt"] = ""
+                current_session["title"] = "Custom Design Case"
+            else:
+                st.session_state[prompt_state_key] = preset_dict[chosen]
+                current_session["prompt"] = preset_dict[chosen]
+                current_session["title"] = chosen.split("(")[0].strip()
+
+    st.selectbox(
+        "Standard Benchmark Library (Optional Examples)",
+        options=list(preset_dict.keys()),
+        index=0,
+        key=f"preset_sel_{st.session_state.active_session_id}",
+        on_change=on_preset_select,
+        help="Select a benchmark specification or enter custom constraints in the text box below."
+    )
 
     # Technical Specification Text Area
     user_prompt = st.text_area(
-        "Technical Engineering Design Brief",
-        value=current_session["prompt"],
+        "Technical Engineering Design Brief (Open-Ended)",
+        key=prompt_state_key,
         height=140,
-        key=f"user_prompt_input_{st.session_state.active_session_id}_{st.session_state.get('last_selected_preset', 'default')}",
-        placeholder="Specify functional requirements, loading modes (bending, tension, torsion, internal pressure), operating temperatures, chemical exposure, or governing standards (ASTM, ISO, ASME)…",
+        placeholder="Enter ANY open-ended technical specification (e.g., 'A hollow titanium or carbon-composite drone arm subjected to 40 N aerodynamic bending at -20 C' or 'Corrosion-resistant marine pump impeller operating in saline brine')...",
         help="Mechanical specifications entered here are parsed for continuum mechanics loading mode, boundary conditions, and environmental degradation kinetic risks."
     )
     current_session["prompt"] = user_prompt

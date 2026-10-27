@@ -1128,18 +1128,19 @@ def create_interactive_ashby_chart(
     fig = go.Figure()
 
     # Group materials by family for interactive toggle in legend
+    name_to_key = {v["name"]: k for k, v in MATERIALS_DATABASE.items()}
     families = sorted(list(set(m.get("family", "Other") for m in materials)))
+    
+    highlighted_points = []
 
     for fam in families:
         fam_mats = [m for m in materials if m.get("family") == fam]
         x_vals = []
         y_vals = []
         hover_texts = []
-        names = []
         marker_sizes = []
         border_widths = []
         border_colors = []
-        marker_symbols = []
 
         for m in fam_mats:
             x_val = m.get(x_prop, 0.0)
@@ -1149,31 +1150,10 @@ def create_interactive_ashby_chart(
             if y_val <= 0 and y_meta["log"]:
                 continue
 
-            # Find key
-            mat_key = None
-            for k, v in MATERIALS_DATABASE.items():
-                if v["name"] == m["name"]:
-                    mat_key = k
-                    break
-
+            mat_key = name_to_key.get(m["name"])
             is_highlighted = mat_key in highlight_keys or m.get("name") in highlight_keys
 
-            x_vals.append(x_val)
-            y_vals.append(y_val)
-            names.append(m["name"])
-
-            if is_highlighted:
-                marker_sizes.append(15)
-                border_widths.append(2)
-                border_colors.append("#ffffff")
-                marker_symbols.append("diamond")
-            else:
-                marker_sizes.append(8)
-                border_widths.append(1)
-                border_colors.append("#1e2025")
-                marker_symbols.append("circle")
-
-            hover_texts.append(
+            hover_text = (
                 f"<b>{m['name']}</b><br>"
                 f"Family: {fam}<br>"
                 f"Density: {m.get('density', 0)/1000.0:.2f} g/cm³<br>"
@@ -1181,27 +1161,56 @@ def create_interactive_ashby_chart(
                 f"Yield Strength: {m.get('yield_strength', 0)} MPa<br>"
                 f"Thermal Conductivity: {m.get('thermal_conductivity', 0)} W/(m·K)<br>"
                 f"Max Temp: {m.get('heat_deflection_temp', 0)}°C<br>"
-                f"Cost: ${m.get('cost_per_kg_usd', 0):.2f}/kg<br>"
-                f"{'★ GOVERNING SELECTION' if is_highlighted else ''}"
+                f"Cost: ${m.get('cost_per_kg_usd', 0):.2f}/kg"
             )
 
+            if is_highlighted:
+                highlighted_points.append({
+                    "x": x_val, "y": y_val, "name": m["name"],
+                    "hover": hover_text + "<br><b>★ TOP RECOMMENDED CANDIDATE</b>"
+                })
+            else:
+                x_vals.append(x_val)
+                y_vals.append(y_val)
+                marker_sizes.append(7)
+                border_widths.append(1)
+                border_colors.append("#18191b")
+                hover_texts.append(hover_text)
+
         color = family_colors.get(fam, "#71717a")
+        if x_vals:
+            fig.add_trace(go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode="markers",
+                name=fam,
+                hoverinfo="text",
+                hovertext=hover_texts,
+                marker=dict(
+                    size=marker_sizes,
+                    color=color,
+                    opacity=0.75,
+                    line=dict(width=border_widths, color=border_colors)
+                )
+            ))
+
+    # Add Top Highlighted Candidate Trace
+    if highlighted_points:
         fig.add_trace(go.Scatter(
-            x=x_vals,
-            y=y_vals,
+            x=[p["x"] for p in highlighted_points],
+            y=[p["y"] for p in highlighted_points],
             mode="markers+text",
-            name=fam,
-            text=names,
-            textposition="top center",
-            textfont=dict(size=8, color="rgba(138, 143, 152, 0.45)", family="Inter, sans-serif"),
+            name="★ Selected Candidate",
+            text=[p["name"] for p in highlighted_points],
+            textposition="top right",
+            textfont=dict(size=11, color="#ffffff", family="Inter, sans-serif"),
             hoverinfo="text",
-            hovertext=hover_texts,
+            hovertext=[p["hover"] for p in highlighted_points],
             marker=dict(
-                size=marker_sizes,
-                color=color,
-                opacity=0.82,
-                symbol=marker_symbols,
-                line=dict(width=border_widths, color=border_colors)
+                size=14,
+                color="#f59e0b",
+                symbol="diamond",
+                line=dict(width=2, color="#ffffff")
             )
         ))
 
