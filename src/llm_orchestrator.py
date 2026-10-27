@@ -130,7 +130,7 @@ Service Boundary Conditions:
 - Submerged aquatic exposure: {boundary.get('submerged_aquatic_exposure', False)}
 - Outdoor solar UV exposure: {boundary.get('outdoor_uv_exposure', False)}
 - Chemical / Acid exposure: {boundary.get('chemical_or_saline_exposure', False)}
-- Target Service Temperature: {engineering_spec.get('numerical_parameters', {}).get('target_service_temperature_c', 'Ambient')} C
+- Target Service Temperature: {(engineering_spec.get('numerical_parameters') or {}).get('target_service_temperature_c', 'Ambient')} C
 
 THE ENGINE HAS IDENTIFIED A CLOSE TIE-BREAK CONDITION (Score Delta: {delta_pct:.1f}%):
 Contender A: {mat1.get('name')}
@@ -141,8 +141,8 @@ Contender A: {mat1.get('name')}
 - Ultimate Tensile Strength: {mat1.get('ultimate_tensile_strength')} MPa
 - Elongation at Break: {mat1.get('elongation_at_break')}%
 - Max Service Temp: {mat1.get('max_service_temp_c')} C
-- Raw Cost: ~${mat1.get('techno_economics', {}).get('raw_cost_usd_per_kg', 10.0)}/kg
-- Sourcing Category: {mat1.get('techno_economics', {}).get('sourcing_category', 'Domestic')}
+- Raw Cost: ~${(mat1.get('techno_economics') or {}).get('raw_cost_usd_per_kg', 10.0)}/kg
+- Sourcing Category: {(mat1.get('techno_economics') or {}).get('sourcing_category', 'Domestic')}
 
 Contender B: {mat2.get('name')}
 - Family: {mat2.get('family')}
@@ -152,8 +152,8 @@ Contender B: {mat2.get('name')}
 - Ultimate Tensile Strength: {mat2.get('ultimate_tensile_strength')} MPa
 - Elongation at Break: {mat2.get('elongation_at_break')}%
 - Max Service Temp: {mat2.get('max_service_temp_c')} C
-- Raw Cost: ~${mat2.get('techno_economics', {}).get('raw_cost_usd_per_kg', 10.0)}/kg
-- Sourcing Category: {mat2.get('techno_economics', {}).get('sourcing_category', 'Domestic')}
+- Raw Cost: ~${(mat2.get('techno_economics') or {}).get('raw_cost_usd_per_kg', 10.0)}/kg
+- Sourcing Category: {(mat2.get('techno_economics') or {}).get('sourcing_category', 'Domestic')}
 
 TASK:
 Perform a deep technical arbitration between Contender A and Contender B.
@@ -163,7 +163,9 @@ Perform a deep technical arbitration between Contender A and Contender B.
 Do NOT use conversational fluff or filler. Begin directly with the analysis.
 """
         if self.mode == self.MODE_AUTONOMOUS_EXPERT:
-            winner = mat1 if mat1.get('techno_economics', {}).get('raw_cost_usd_per_kg', 10.0) <= mat2.get('techno_economics', {}).get('raw_cost_usd_per_kg', 10.0) else mat2
+            mat1_cost = (mat1.get('techno_economics') or {}).get('raw_cost_usd_per_kg', 10.0)
+            mat2_cost = (mat2.get('techno_economics') or {}).get('raw_cost_usd_per_kg', 10.0)
+            winner = mat1 if mat1_cost <= mat2_cost else mat2
             return {
                 "arbitrated": True,
                 "engine": "Autonomous Expert Arbitration Engine",
@@ -248,17 +250,18 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
         thinking_log: List[Dict[str, str]] = []
 
         # Phase 1: Physical Specification Parsing
-        ashby_key = engineering_spec.get("synthesized_engineering_spec", {}).get("primary_governing_ashby_index", AshbyIndex.BEAM_STIFFNESS)
-        derived_formula = engineering_spec.get("synthesized_engineering_spec", {}).get("ashby_mathematical_formula", "E^(1/2) / ρ")
-        boundary = engineering_spec.get("boundary_conditions_and_constraints", {})
+        synth_spec = engineering_spec.get("synthesized_engineering_spec") or {}
+        ashby_key = synth_spec.get("primary_governing_ashby_index", AshbyIndex.BEAM_STIFFNESS)
+        derived_formula = synth_spec.get("ashby_mathematical_formula", "E^(1/2) / ρ")
+        boundary = engineering_spec.get("boundary_conditions_and_constraints") or {}
         is_submerged = boundary.get("submerged_aquatic_exposure", False)
         is_outdoor_uv = boundary.get("outdoor_uv_exposure", False)
         mfg_process = boundary.get("manufacturing_process", "Universal Multi-Process Evaluation")
-        temp_c = engineering_spec.get("numerical_parameters", {}).get("target_service_temperature_c")
+        temp_c = (engineering_spec.get("numerical_parameters") or {}).get("target_service_temperature_c")
 
         thinking_log.append({
             "phase": "Phase 1: Scientific Specification & Loading Analysis",
-            "details": f"Component classified as '{engineering_spec.get('synthesized_engineering_spec', {}).get('component_classification', 'Mechanical Component')}'. "
+            "details": f"Component classified as '{synth_spec.get('component_classification', 'Mechanical Component')}'. "
                        f"Identified primary loading mode governed by Ashby Index {ashby_key} ({derived_formula}). "
                        f"Boundary conditions: Submerged={is_submerged}, UV Exposure={is_outdoor_uv}, Max Temp={temp_c or 'Ambient'}°C."
         })

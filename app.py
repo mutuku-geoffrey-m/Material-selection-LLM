@@ -768,8 +768,11 @@ with col_right:
         bnd_spec = spec.get("boundary_conditions_and_constraints", {})
 
         # Executive Recommendation Banner
-        arbitrated = res.get("arbitration_result", {}).get("arbitrated", False)
-        arb_badge_html = f"<span class='badge-arbitrated'>Cloud Arbitration: {res['arbitration_result']['engine']}</span>" if arbitrated else f"<span class='badge-verified'>Engine: {res['mode_used']}</span>"
+        arb_res = res.get("arbitration_result") or {}
+        arbitrated = arb_res.get("arbitrated", False)
+        arb_engine = arb_res.get("engine", "Cloud Arbitration")
+        engine_used = res.get("mode_used", "Deterministic Solver")
+        arb_badge_html = f"<span class='badge-arbitrated'>Cloud Arbitration: {arb_engine}</span>" if arbitrated else f"<span class='badge-verified'>Engine: {engine_used}</span>"
 
         st.markdown(f"""
         <div class="wb-card">
@@ -927,7 +930,7 @@ with col_right:
             arb = res.get("arbitration_result")
             if arb and arb.get("arbitrated"):
                 st.markdown("<div style='border-top: 1px solid #23252a; margin: 12px 0;'></div>", unsafe_allow_html=True)
-                st.markdown(f"**Cloud Internet Tie-Breaking Arbitration ({arb['engine']})**")
+                st.markdown(f"**Cloud Internet Tie-Breaking Arbitration ({arb.get('engine', 'Cloud AI')})**")
                 st.caption(arb.get("arbitration_notes", ""))
 
         with tab5:
@@ -940,7 +943,8 @@ with col_right:
             retrieved = res.get("retrieved_chunks", [])
             if retrieved:
                 for i, chunk in enumerate(retrieved, 1):
-                    st.markdown(f"**Chunk [{i}] // Document:** `{chunk.get('metadata', {}).get('document_title', 'ASTM/ISO Reference')}` &nbsp;|&nbsp; **Relevance:** `{chunk.get('score', 0):.3f}`")
+                    meta = chunk.get("metadata") or {}
+                    st.markdown(f"**Chunk [{i}] // Document:** `{meta.get('document_title', 'ASTM/ISO Reference')}` &nbsp;|&nbsp; **Relevance:** `{chunk.get('score', 0):.3f}`")
                     st.code(chunk.get("text", ""), language="markdown")
             else:
                 st.caption("No vector store chunks retrieved for active query.")
