@@ -1,26 +1,54 @@
-# Autonomous Agents & AI System Cruft
+# ==============================================================================
+# Graded Academic Proposals, Theses & Evaluation Rubrics (Confidential / Private)
+# ==============================================================================
+CAPSTONE_PROPOSAL.md
+CAPSTONE_THESIS_REPORT.md
+proposal.pdf
+proposal.tex
+proposal_compiled.html
+proposal*
+figures/
+Mechanical Engineering Project Evaluation.pdf
+*.pdf
+
+# ==============================================================================
+# AI Agent Workspaces, Subagent Directories & Framework Caches
+# ==============================================================================
 .agents/
+.claude/
+.vibe-ui/
 .gemini/
+.system_generated/
+AGENTS.md
+CLAUDE.md
+skills-lock.json
 scratch/
 skills/
 brain/
 __pycache__/
 *.pyc
 
-# Virtual Environments
+# ==============================================================================
+# Virtual Environments & Build
+# ==============================================================================
 .venv/
 venv/
 env/
 
-# Data & Models (Avoid pushing large files to GitHub)
+# ==============================================================================
+# Data & Vector Storage (Large binary stores generated locally)
+# ==============================================================================
 chroma_db_store/
 models/
+state/
 *.safetensors
 *.bin
 *.gguf
 *.pt
 
-# Testing & Caching
+# ==============================================================================
+# Testing, Coverage & Temporary Logs
+# ==============================================================================
 .pytest_cache/
 .coverage
 htmlcov/
@@ -30,9 +58,13 @@ run_tests.py
 results_comparison.csv
 scripts/run_comparative_experiment.py
 
-# Environment & Secrets
+# ==============================================================================
+# Secrets & Local Configurations
+# ==============================================================================
 .env
 
-# OS Generated Files
+# ==============================================================================
+# Operating System Files
+# ==============================================================================
 .DS_Store
 Thumbs.db
