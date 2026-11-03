@@ -528,7 +528,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
 | :---: | :--- | :--- | :---: | :---: | :--- | :---: | :---: | :--- | :---: |
 """ + "\n".join(table_rows) + f"""
 
-**Comprehensive Supply Chain Insights & Academic Methodology:**
+**Supply Chain Sourcing Analysis:**
 - **Rank 1 Optimal Trade-Off:** `{techno_economic_leaderboard[0]['name']}` achieved the highest overall TOPSIS composite score ({techno_economic_leaderboard[0]['composite_score']:.1f}/100) balancing continuum mechanics performance against procurement lead times, tariffs, and carrying costs.
 - **Incoterms 2020 Total Landed Cost (TLC):** Evaluates mill price $C_{{EXW}}$, international ocean/air freight, marine insurance (0.44%), Kenyan customs tariffs (EAC CET 0% to 25%, IDF 2.5%, RDL 2.0%, VAT 16.0%), port handling at Mombasa Port ($0.08/kg), and SGR inland freight to Nairobi ($0.10/kg).
 - **Stochastic Lead Time & Safety Stock ($SS$):** Formulated via Silver, Pyke & Peterson (1998): $SS = z_{{\\alpha}} \\sqrt{{\\mu_L \\sigma_D^2 + D^2 \\sigma_L^2}}$ at 95% service level ($z = 1.645$) to guarantee zero plant stockouts despite maritime transit volatility.
@@ -759,7 +759,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
         elif "toy" in comp_class or "prototyping" in comp_class or "cheap" in user_prompt.lower() or "kid" in user_prompt.lower():
             response_lines.extend([
                 f"- **Prototyping & Consumer Safety:** Desktop prototypes and toys require non-toxic, safe materials with minimal thermal contraction warpage, crisp geometric resolution, and low unit cost.",
-                f"- **Selection Rationale:** **{top_mat['name']}** is the gold standard for rapid prototyping and toys ($20-$25/kg), printing with zero chamber odor or warpage, providing robust yield strength ({top_mat_data['yield_strength']} MPa) safe for handling."
+                f"- **Selection Rationale:** **{top_mat['name']}** is a standard choice for rapid prototyping and toys ($20-$25/kg), printing with low odor, minimal warpage, and tensile yield strength ({top_mat_data['yield_strength']} MPa) suitable for handling."
             ])
         elif "optical" in comp_class or "transparent" in comp_class or "glass" in user_prompt.lower() or "clear" in user_prompt.lower():
             response_lines.extend([
@@ -769,7 +769,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
         elif "bottle" in user_prompt.lower() or "vessel" in comp_class:
             response_lines.extend([
                 f"- **Fluid Containment & Food-Grade Hygiene:** Pressure vessels and water bottles require certified food safety, zero plasticizer leaching, and high hoop burst resistance ($M = \\sigma_y^{{1/2}} / \\rho$).",
-                f"- **Selection Rationale:** **{top_mat['name']}** combines certified food-grade purity, excellent chemical resistance, and robust impact toughness to prevent cracking upon drops."
+                f"- **Selection Rationale:** **{top_mat['name']}** combines certified food-grade purity, chemical resistance, and high impact toughness to prevent cracking upon drops."
             ])
         elif "pipe" in user_prompt.lower() or "plumbing" in comp_class:
             response_lines.extend([
@@ -816,7 +816,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
             response_lines.extend([
                 "### 4. Metallurgical & Subtractive (CNC) Manufacturing Directives",
                 f"- **Machining Parameters:** CNC 3-axis to 5-axis milling from solid billet stock using high-grade carbide endmills with flood coolant.",
-                f"- **Feeds, Speeds & Lubrication:** Use rigid clamping and optimized chip load to prevent work-hardening (crucial for stainless steel and titanium).",
+                f"- **Feeds, Speeds & Lubrication:** Use rigid clamping and appropriate chip load to prevent work-hardening (important for austenitic stainless steel and titanium alloys).",
                 f"- **Surface Finish & Tolerances:** Post-machining achievable surface finish $R_a \\le 0.8 - 1.6\\ \\mu\\text{{m}}$ with dimensional tolerances within $\\pm 0.025\\ \\text{{mm}}$.",
                 "- **Post-Processing & Passivation:** Type III hardcoat anodizing for aluminum alloys; chemical citric/nitric passivation for stainless steel and titanium to form a hermetic oxide layer."
             ])

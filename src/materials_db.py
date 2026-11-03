@@ -1,5 +1,5 @@
 """
-Comprehensive Materials Database for Additive Manufacturing & Engineering Selection.
+Materials Database for Engineering Selection.
 Contains mechanical, thermal, environmental, and FDM manufacturing properties,
 including empirical degradation data (water saturation, UV exposure, fatigue).
 """
@@ -964,7 +964,7 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
 # Canonical alias for compatibility
 MATERIALS_DATABASE["Alumina_Al2O3"] = MATERIALS_DATABASE["Alumina_Ceramic"]
 
-# Dynamically load the comprehensive materials catalog (1,470+ materials)
+# Dynamically load materials catalog (1,470+ materials)
 import os
 import json
 

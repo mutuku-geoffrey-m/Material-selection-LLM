@@ -225,7 +225,7 @@ The workbench interface is split into two primary panels:
 - **Execute Button:** Click **"Execute Screening & Optimization"** to launch the analysis.
 
 #### Right Panel: Multi-Objective Analysis & Sizing
-Once executed, the right panel populates with comprehensive engineering diagnostics:
+Once executed, the right panel displays the engineering analysis:
 - **Governing Material Banner:** Highlights the #1 optimal material, its material family, governing Ashby index, and key mechanical constants (yield strength $\sigma_y$, Young's modulus $E$, density $\rho$).
 - **Interactive Log-Log Ashby Chart:** Generates an interactive Plotly property space chart ($E$ vs. $\rho$, $\sigma_y$ vs. $\rho$, or thermal conductivity vs. density) plotting the material universe with the theoretical Ashby selection guide line. Hover over any bubble to inspect mechanical properties.
 - **Incoterms 2020 Sourcing & Landed Cost Breakdown:** A multi-column procurement table displaying Ex Works (EXW) price, Delivered Duty Paid (DDP) cost to Nairobi via Kilindini Harbour (Mombasa), customs tariffs (EAC CET), freight lead times, buffer safety stock, and Kraljic risk quadrant (*Strategic, Bottleneck, Leverage, Routine*).

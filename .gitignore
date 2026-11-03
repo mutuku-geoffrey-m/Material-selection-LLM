@@ -7,6 +7,7 @@ proposal.pdf
 proposal.tex
 proposal_compiled.html
 proposal*
+scripts/update_proposal.py
 figures/
 Mechanical Engineering Project Evaluation.pdf
 *.pdf
