@@ -25,7 +25,7 @@ class AshbyIndex:
 
     # Function: Specialized mechanical indices
     FLYWHEEL_INERTIA = "flywheel_inertia"   # M = sigma_y / rho (Max rotational kinetic energy)
-    ELASTIC_ENERGY = "elastic_energy"       # M = sigma_y^2 / E (Flexural compliance & shock damping)
+    ELASTIC_ENERGY = "elastic_energy"       # M = sigma_y^2 / (E * rho) (Elastic strain energy per unit mass)
     THERMAL_DIFFUSIVITY = "thermal_diffusivity" # a = lambda / (rho * Cp) (Heat dissipation)
     THERMAL_CONDUCTIVITY = "thermal_conductivity" # M = lambda (Steady-state heat conduction / heat sinks)
     THERMAL_INSULATION = "thermal_insulation"     # M = 1 / lambda (Thermal barriers)
@@ -83,8 +83,8 @@ INDEX_DESCRIPTIONS = {
         "maximize": True
     },
     AshbyIndex.ELASTIC_ENERGY: {
-        "name": "Maximum Elastic Strain Energy",
-        "formula": "σ_y^2 / E",
+        "name": "Maximum Elastic Strain Energy per Unit Mass",
+        "formula": "σ_y^2 / (E · ρ)",
         "primary_application": "Springs, flexible clips, compliant mechanisms, shock absorbing bumpers",
         "maximize": True
     },
@@ -177,8 +177,9 @@ def calculate_ashby_index(material: Dict[str, Any], index_key: str, use_printed_
         return sigma_y_mpa / (rho / 1000.0)
 
     elif index_key == AshbyIndex.ELASTIC_ENERGY:
-        # sigma_y^2 / E (MJ/m^3) -> (MPa^2 / GPa) = MPa * (MPa/GPa) = kJ/m^3
-        return (sigma_y_mpa ** 2) / E_gpa
+        # sigma_y^2 / (E * rho) (MJ/kg or kJ/kg elastic strain energy storage per unit mass)
+        rho_g_cm3 = rho / 1000.0
+        return (sigma_y_mpa ** 2) / (E_gpa * rho_g_cm3)
 
     elif index_key == AshbyIndex.THERMAL_CONDUCTIVITY:
         return k_thermal
@@ -1013,7 +1014,7 @@ def derive_selection_guide(prompt_context: str) -> Dict[str, Any]:
     ]):
         return {
             "index_key": AshbyIndex.ELASTIC_ENERGY,
-            "reasoning": "Elastic strain energy absorption to mitigate impact shock and absorb kinetic energy: M = σ_y^2 / E."
+            "reasoning": "Elastic strain energy absorption to mitigate impact shock and absorb kinetic energy: M = σ_y^2 / (E · ρ)."
         }
 
     # 5. Thin Skin / Shell / Plate / Panel / Case geometry

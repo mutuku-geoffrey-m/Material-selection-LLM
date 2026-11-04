@@ -420,7 +420,7 @@ class NLPTranslationLayer:
             ashby_reasoning = "Thermal conduction and rapid heat spreading (Fourier physics): M = λ."
         elif component_type in ["wear_cushion_footwear", "flexible_elastomeric_component", "elastic_suspension_or_damping"]:
             ashby_key = AshbyIndex.ELASTIC_ENERGY
-            ashby_reasoning = "Elastic energy mitigation, impact damping, and maximum reversible deflection: M = σ_y^2 / E."
+            ashby_reasoning = "Elastic energy mitigation, impact damping, and maximum reversible deflection: M = σ_y^2 / (E · ρ)."
         elif component_type == "transparent_optical_component":
             ashby_key = AshbyIndex.PLATE_STRENGTH
             ashby_reasoning = "Optical transparency with shatter resistance: M = σ_y^(1/2) / ρ."

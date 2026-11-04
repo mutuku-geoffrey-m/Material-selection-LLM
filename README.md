@@ -4,7 +4,7 @@
 **Project Code:** EKM/1/2026  
 **Department:** Department of Mechanical and Manufacturing Engineering  
 **Faculty:** Faculty of Engineering, University of Nairobi  
-**Academic Year:** 2025/2026  
+**Academic Year:** 2026/2027  
 
 ---
 
@@ -25,7 +25,7 @@ While classical selection methods rely on manual two-dimensional Ashby charts, t
 This software system, developed as our final year engineering project, addresses this problem through a decoupled architecture:
 1. **Natural Language Translation:** A parser extracts mechanical requirements (load type, geometry, temperature limits, chemical exposures, and industry standards) from technical prompts.
 2. **Boolean Physical Gating:** Filters out materials that fail hard physical constraints (e.g., optical transparency, cryogenic ductile-to-brittle limits, or non-magnetic requirements).
-3. **Deterministic Ashby Calculation Engine:** Calculates analytical Michael F. Ashby performance indices across an expanded, unit-normalized database of 1,490 standardized engineering materials using pure numerical formulas in Python.
+3. **Deterministic Ashby Calculation Engine:** Calculates analytical Michael F. Ashby performance indices across an expanded, unit-normalized database of 1,470 standardized engineering materials using pure numerical formulas in Python.
 4. **Techno-Economic Sourcing & Logistics Module:** Calculates the realistic Delivered Duty Paid (DDP) cost to Nairobi via Kilindini Port (Mombasa), accounting for maritime freight, East African Community Common External Tariffs (EAC CET), Import Declaration Fees, Railway Development Levies, VAT, Mombasa port handling, and Standard Gauge Railway (SGR) rail haulage. It also models stochastic safety stock and Wilson-Harris Economic Order Quantities.
 5. **TOPSIS Multi-Criteria Decision Analysis:** Ranks candidate materials by balancing mechanical performance, landed cost, lead time, and supply availability using vector-normalized TOPSIS.
 6. **Local LLM Synthesis:** Uses a local offline language model (`llama3.2` running via Ollama) to synthesize practical machining, heat-treatment, and failure-prevention notes based on verified data sheets retrieved from a local ChromaDB store.
@@ -58,11 +58,16 @@ The delivered procurement cost per kilogram ($C_{\text{DDP}}$) delivered to fact
 $$C_{\text{DDP}} = C_{\text{CIF}} + \text{Tariff}_{\text{EAC}} + \text{IDF} + \text{RDL} + \text{VAT} + \text{Port}_{\text{THC}} + \text{Inland}_{\text{SGR}} + \text{Clearance}_{\text{broker}}$$
 
 Where:
-- $C_{\text{CIF}} = C_{\text{EXW}} \cdot \gamma_{\text{form}} + C_{\text{freight}} + C_{\text{insurance}}$
-- $\text{IDF} = 0.035 \times C_{\text{CIF}}$ (Import Declaration Fee)
-- $\text{RDL} = 0.020 \times C_{\text{CIF}}$ (Railway Development Levy)
-- $\text{VAT} = 0.160 \times (C_{\text{CIF}} + \text{Tariff} + \text{IDF} + \text{RDL})$
-- Fixed port handling, documentation, and rail haulage from Mombasa to Nairobi Inland Container Depot (ICD) are set at \$0.42/kg.
+- $C_{\text{CIF}} = C_{\text{EXW}} \cdot \gamma_{\text{form}} + C_{\text{freight}} + C_{\text{insurance}}$ (with marine cargo insurance at 0.40% ad valorem on 110% CIF under Institute Cargo Clauses A).
+- $\text{IDF} = 0.025 \times C_{\text{CIF}}$ (Import Declaration Fee, 2.5% under the Kenya Miscellaneous Fees and Levies Act).
+- $\text{RDL} = 0.020 \times C_{\text{CIF}}$ (Railway Development Levy, 2.0% ad valorem).
+- $\text{Tariff}_{\text{EAC}}$ follows the EAC Common External Tariff (CET) 4-band structure: 0% for primary raw materials and capital goods, 10% for intermediate goods not available locally, 25% for intermediate goods available in the region, and 35% for finished products.
+- $\text{VAT} = 0.160 \times (C_{\text{CIF}} + \text{Tariff} + \text{IDF} + \text{RDL})$ (16.0% ad valorem, Kenya Value Added Tax Act).
+- Port handling, SGR rail haulage, and customs clearance documentation:
+  - $\text{Port}_{\text{THC}} = \$0.08/\text{kg}$ (Mombasa Kilindini Port terminal handling per KPA tariff schedule).
+  - $\text{Inland}_{\text{SGR}} = \$0.10/\text{kg}$ (Standard Gauge Railway containerized rail freight from Mombasa to Nairobi ICD).
+  - $\text{Clearance}_{\text{broker}} = \$0.05/\text{kg}$ (customs brokerage, Kentrade processing, and port documentation).
+  - Total fixed destination logistics = \$0.23/kg.
 
 ### 2.3 Safety Stock and Order Quantity Formulations
 
@@ -84,10 +89,12 @@ Where:
 ├── cli.py                     # Headless command-line interface
 ├── requirements.txt           # Python package dependencies
 ├── .env.example               # Environment variables template
-├── .gitignore                 # Version control exclusions
+├── .streamlit/
+│   └── config.toml            # Workbench theme and server configuration
 ├── data/
-│   ├── materials_catalog.json           # Curated database of 1,490+ materials
+│   ├── materials_catalog.json           # Curated database of 1,470 engineering materials
 │   ├── engineering_intent_dataset.json   # Intent classification dataset
+│   ├── instruction_tuning_dataset.jsonl # Instruction-tuning dataset
 │   ├── build_dataset.py                 # Dataset assembly script
 │   └── generate_instruction_dataset.py  # Data formatting utilities
 ├── knowledge_base/                      # Technical documentation and standards
@@ -96,7 +103,9 @@ Where:
 │   ├── advanced_composites_and_polymers.md
 │   ├── hydrodynamic_surface_roughness_and_epoxy.md
 │   ├── micro_hydro_kenya_case_study.md
-│   └── polymer_degradation_water_uv.md
+│   ├── polymer_degradation_water_uv.md
+│   ├── fdm_additive_manufacturing_constraints.md
+│   └── materials_data_sheets.md
 ├── scripts/
 │   └── build_materials_catalog.py       # Catalog generator and normalizer
 └── src/
@@ -195,13 +204,13 @@ For the natural language translation layer to extract accurate boundary conditio
    - *Bending:* Cantilever or supported beam deflection ($M = E^{1/2} / \rho$) or plastic collapse ($M = \sigma_y^{2/3} / \rho$).
    - *Plate Out-of-Plane Bending:* Panels, bulkheads, car body panels ($M = E^{1/3} / \rho$ or $M = \sigma_y^{1/2} / \rho$).
    - *Torsion:* Shafts, couplings, drill strings ($M = G^{1/2} / \rho$).
-   - *Elastic Energy Storage:* Helical or leaf springs ($M = \sigma_y^2 / E$).
+   - *Elastic Energy Storage:* Helical or leaf springs ($M = \sigma_y^2 / (E \rho)$).
    - *Thermal Conduction:* Heat sinks, cooling fins ($M = \lambda / \rho$).
 3. **Environmental & Thermal Constraints:** Where does the part operate?
    - Temperature ranges (e.g. *cryogenic -196 °C, ambient, or high temperatures > 400 °C*).
    - Fluid exposure (e.g. *submerged in river sediment, marine saline water, industrial cutting fluids, acids, or vacuum*).
 4. **Manufacturing Process:**
-   - Universal search across all 1,490+ materials (metals, polymers, composites, ceramics) or restricted to *FDM Additive Manufacturing* filaments or *CNC Machining*.
+   - Universal search across all 1,470 materials (metals, polymers, composites, ceramics) or restricted to *FDM Additive Manufacturing* filaments or *CNC Machining*.
 5. **Governing Standards (Optional):**
    - E.g. *ASTM E466, ASTM A36, ISO 527, ASME Section VIII*.
 
@@ -234,7 +243,7 @@ Once executed, the right panel displays the engineering analysis:
 
 #### Sidebar Utilities
 - **Design Cases Manager:** Create new design cases with **"+ New Design Case"** or switch between previous cases. Each case preserves its own independent prompt, inputs, and results.
-- **Material Database Inspector:** Select any material from the 1,490-grade database to inspect its standardized mechanical properties, thermal limits, and raw cost.
+- **Material Database Inspector:** Select any material from the 1,470-grade database to inspect its standardized mechanical properties, thermal limits, and raw cost.
 
 ### 6.3 Sample Open-Ended Prompts to Try
 
@@ -254,7 +263,7 @@ Copy and paste any of the following open-ended technical briefs into the text ar
 "Support bulkhead for a high-precision satellite optical camera. Requires near-zero thermal expansion coefficient, maximum specific stiffness E/rho to survive launch acoustic vibration, and zero outgassing in vacuum."
 
 5. Heavy-Duty Truck Suspension Leaf Spring (Elastic Strain Energy):
-"Heavy commercial transport vehicle suspension spring operating over rough gravel roads. Maximize elastic strain energy storage per unit weight (sigma_y^2 / E) while maintaining high fracture toughness and resistance to cyclic fatigue."
+"Heavy commercial transport vehicle suspension spring operating over rough gravel roads. Maximize elastic strain energy storage per unit mass (sigma_y^2 / (E * rho)) while maintaining high fracture toughness and resistance to cyclic fatigue."
 ```
 
 ---
