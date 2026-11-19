@@ -191,7 +191,7 @@ def warm_model():
     def _go():
         try:
             body = json.dumps({"model": MODEL, "prompt": "ok", "stream": False, "keep_alive": "30m",
-                               "options": {"num_predict": 1}}).encode()
+                               "options": {"num_predict": 1, "num_ctx": 2048, "num_thread": 4}}).encode()
             req = urllib.request.Request(OLLAMA_URL + "/api/generate", data=body,
                                          headers={"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=300).read()
@@ -226,6 +226,21 @@ def shortcut_exists():
 
 
 # ---------------------------------------------------------------- main
+def load_env_file():
+    """Read .env (LOCAL_MODEL, OLLAMA_BASE_URL, ...) so the launcher uses the same settings as the app."""
+    global MODEL, OLLAMA_URL, APP_PORT
+    env = ROOT / ".env"
+    if env.exists():
+        for line in env.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.split("#")[0].strip())
+    MODEL = os.getenv("LOCAL_MODEL", MODEL)
+    OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", OLLAMA_URL).rstrip("/")
+    APP_PORT = int(os.getenv("STREAMLIT_SERVER_PORT", str(APP_PORT)))
+
+
 def main():
     os.chdir(ROOT)
     if not (ROOT / "app.py").exists():
@@ -245,6 +260,7 @@ def main():
 
     if not (ROOT / ".env").exists() and (ROOT / ".env.example").exists():
         shutil.copy(ROOT / ".env.example", ROOT / ".env")
+    load_env_file()
 
     exe = ensure_ollama()
     if exe:

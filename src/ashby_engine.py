@@ -993,6 +993,11 @@ def rank_materials(
 
     # Sort descending by thermal viability first, then final metric
     ranked.sort(key=lambda x: (not x["thermally_inviable"], x["final_metric"]), reverse=True)
+    if max_service_temp_c is not None:
+        # Hard exclusion: a material that cannot survive the service temperature must never be shown as a candidate.
+        viable = [r for r in ranked if not r["thermally_inviable"]]
+        if viable:
+            ranked = viable
     return ranked
 
 

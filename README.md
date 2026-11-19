@@ -136,7 +136,7 @@ Where:
 
 Double-click **`EMS-OS.exe`** (or `Start_EMS-OS.bat` if the exe has not been built). On the first run it installs whatever is missing (Python 3.12, Ollama, the project dependencies and the `llama3.2` model), creates an `EMS-OS` shortcut on the Desktop and opens the workbench at `http://localhost:8501`. Later runs, from the exe or the shortcut, only start the required services and open the browser. To rebuild the exe, run `launcher\build_exe.bat`.
 
-Timeouts for the optional language-model features are configurable in `.env`: `EMS_LLM_TIMEOUT_S` (local commentary, default 90), `EMS_ROUTER_TIMEOUT_S` (intent router, default 20) and `EMS_CLOUD_TIMEOUT_S` (cloud arbitration, default 20). Rankings and landed-cost figures are computed deterministically and do not depend on them.
+Timeouts for the optional language-model features are configurable in `.env`: `EMS_LLM_TIMEOUT_S` (local commentary, default 120), `EMS_ROUTER_TIMEOUT_S` (intent router, default 20) and `EMS_CLOUD_TIMEOUT_S` (cloud arbitration, default 20). Rankings and landed-cost figures are computed deterministically and do not depend on them.
 
 Cloud/second-opinion arbitration triggers automatically when the top two candidates are within 8% on the governing Ashby index; it uses the Gemini key if one is set in `.env`, otherwise the local model.
 
@@ -184,6 +184,13 @@ cp .env.example .env
 The application runs completely offline using the local Ollama instance (`http://localhost:11434`). If you wish to test cloud model arbitration, you can optionally provide an API key in `.env`.
 
 ---
+
+### Low-memory computers (8 GB RAM)
+`llama3.2` (3B, about 2 GB) fits in 8 GB, but on a CPU-only laptop it writes roughly 3-8 tokens per second, so commentary can take a minute or two (output is streamed; the timeout only triggers if no text arrives for `EMS_LLM_TIMEOUT_S` seconds). To make it faster:
+1. Close the browser tabs and other heavy programs while running.
+2. Use the 1B model: run `ollama pull llama3.2:1b` and set `LOCAL_MODEL=llama3.2:1b` in `.env` (about 2-3 times faster, shorter commentary).
+3. Keep the launcher window open so the model stays loaded between queries.
+The material ranking and costs never wait for the model and are always produced first.
 
 ### Troubleshooting
 - **No LLM commentary in the report:** the report says why. Check that Ollama is running (`ollama list`) and that `llama3.2` is installed; the first request after a cold start can be slow, so raise `EMS_LLM_TIMEOUT_S` in `.env` if needed. Rankings and costs are unaffected.

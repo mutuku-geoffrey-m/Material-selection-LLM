@@ -7,6 +7,7 @@ Chain-of-Thought Engineering Reasoning, and Techno-Economic Supply Chain Optimiz
 import os
 import re
 import json
+import time
 import urllib.request
 import urllib.error
 from typing import Dict, Any, Optional, List, Tuple
@@ -43,7 +44,7 @@ class LLMOrchestrator:
         self.local_model = local_model or os.getenv("LOCAL_MODEL", "llama3.2")
         # Timeouts are configurable. A CPU-only llama3.2 needs far longer than 3 s to load and write ~250 tokens,
         # so the old 3 s breaker made the LLM commentary fail on essentially every prompt.
-        self.local_timeout_s = float(os.getenv("EMS_LLM_TIMEOUT_S", "90"))
+        self.local_timeout_s = float(os.getenv("EMS_LLM_TIMEOUT_S", "120"))
         self.cloud_timeout_s = float(os.getenv("EMS_CLOUD_TIMEOUT_S", "20"))
         self.last_llm_error: Optional[str] = None
 
@@ -520,7 +521,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
 
                 table_rows.append(
                     f"| {item['overall_rank']} | **{item['name']}** | {item['family']} | "
-                    f"{item['technical_ashby_score']:.2f} | ${exw:.2f} / **${ddp:.2f}** | "
+                    f"{item['technical_ashby_score']:.2f} | \\${exw:.2f} / **\\${ddp:.2f}** | "
                     f"{origin} | {lead:.0f}d (SS: {ss_kg:.1f}kg) | "
                     f"**{quad}** | MOQ: {moq:.0f}kg / EOQ: {eff_eoq:.0f}kg | "
                     f"**{score:.1f}** |"
@@ -539,7 +540,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
 
 **Supply Chain Sourcing Analysis:**
 - **Rank 1 Optimal Trade-Off:** `{techno_economic_leaderboard[0]['name']}` achieved the highest overall TOPSIS composite score ({techno_economic_leaderboard[0]['composite_score']:.1f}/100) balancing continuum mechanics performance against procurement lead times, tariffs, and carrying costs.
-- **Incoterms 2020 Total Landed Cost (TLC):** Evaluates mill price $C_{{EXW}}$, international ocean/air freight, marine insurance (0.44%), Kenyan customs tariffs (EAC CET 0% to 25%, IDF 2.5%, RDL 2.0%, VAT 16.0%), port handling at Mombasa Port ($0.08/kg), and SGR inland freight to Nairobi ($0.10/kg).
+- **Incoterms 2020 Total Landed Cost (TLC):** Evaluates mill price $C_{{EXW}}$, international ocean/air freight, marine insurance (0.40% on 110% of FOB + freight), Kenyan customs tariffs (EAC CET 0% to 25%, IDF 2.5%, RDL 2.0%, VAT 16.0%), port handling at Mombasa Port (\\$0.08/kg), and SGR inland freight to Nairobi (\\$0.10/kg).
 - **Stochastic Lead Time & Safety Stock ($SS$):** Formulated via Silver, Pyke & Peterson (1998): $SS = z_{{\\alpha}} \\sqrt{{\\mu_L \\sigma_D^2 + D^2 \\sigma_L^2}}$ at 95% service level ($z = 1.645$) to guarantee zero plant stockouts despite maritime transit volatility.
 - **Kraljic Portfolio Matrix (Kraljic, 1983):** Classifies candidate materials into Strategic (high profit impact, high supply risk), Bottleneck (low profit impact, high supply risk), Leverage (high profit impact, low supply risk), or Routine (low profit impact, low supply risk).
 - **Wilson-Harris EOQ & MOQ Constraint:** Optimal procurement batch size is calculated as $Q^* = \\sqrt{{\\frac{{2DS}}{{H}}}}$ with Hadley-Whitin quantity breaks and excess inventory horizon checks ($Q_{{MOQ}}/D \\le \\tau_{{shelf}}$).
@@ -566,8 +567,8 @@ Keep response strictly under 180 words. Professional engineering terminology onl
             req_data = json.dumps({
                 "model": self.local_model,
                 "prompt": prompt,
-                "stream": False,
-                "keep_alive": "15m",
+                "stream": True,
+                "keep_alive": "30m",
                 "options": {
                     "temperature": 0.1,
                     "top_p": 0.9,
@@ -583,10 +584,22 @@ Keep response strictly under 180 words. Professional engineering terminology onl
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
+            # Streamed: the timeout is an IDLE timeout between chunks (first chunk includes the one-off model load),
+            # so a slow CPU that keeps producing tokens is never cut off; EMS_LLM_MAX_S caps the total time.
+            started = time.time()
+            max_total_s = float(os.getenv("EMS_LLM_MAX_S", "300"))
+            parts = []
             with urllib.request.urlopen(req, timeout=self.local_timeout_s) as response:
-                result = json.loads(response.read().decode("utf-8"))
-                self.last_llm_error = None
-                return result.get("response") or result.get("choices", [{}])[0].get("text")
+                for raw in response:
+                    if not raw.strip():
+                        continue
+                    chunk = json.loads(raw.decode("utf-8"))
+                    parts.append(chunk.get("response", ""))
+                    if chunk.get("done") or (time.time() - started) > max_total_s:
+                        break
+            self.last_llm_error = None
+            text = "".join(parts).strip()
+            return text or None
         except Exception as e:
             self.last_llm_error = f"{type(e).__name__}: {str(e)[:80]}"
             return None

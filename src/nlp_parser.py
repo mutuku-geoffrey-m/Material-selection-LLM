@@ -211,7 +211,7 @@ class NLPTranslationLayer:
             component_type = "heavy_duty_lifting_or_crane"
         elif any(w in prompt_lower for w in ["gear", "bushing", "bearing", "pulley", "low friction", "sliding"]):
             component_type = "low_friction_gear_or_bushing"
-        elif any(w in prompt_lower for w in ["furnace", "kiln", "crucible", "refractory", "foundry ladle", "hearth stone", "baking hearth", "oven", "exhaust", "rocket nozzle", "manifold", "700 c", "350 c", "500 c", "650 c", "800 c", "900 c", "1000 c"]):
+        elif any(w in prompt_lower for w in ["furnace", "kiln", "crucible", "refractory", "incinerat", "incenerat", "incen", "inciner", "combustion chamber", "foundry ladle", "hearth stone", "baking hearth", "oven", "exhaust", "rocket nozzle", "manifold", "700 c", "350 c", "500 c", "650 c", "800 c", "900 c", "1000 c"]):
             component_type = "high_temperature_thermal_barrier"
         elif any(w in prompt_lower for w in ["spoiler", "car spoiler", "rear wing", "trunk wing", "downforce wing", "front splitter", "diffuser", "canard", "dive plane"]) or ("wing" in prompt_lower and any(c in prompt_lower for c in ["car", "automotive", "track", "race", "sports", "downforce"])):
             component_type = "automotive_aerodynamic_wing_or_spoiler"
@@ -286,7 +286,7 @@ class NLPTranslationLayer:
         is_refractory = any(w in prompt_lower for w in [
             "furnace", "crucible", "refractory", "foundry ladle", "hearth stone", "baking hearth",
             "combustion", "900 c", "700 c", "800 c", "1000 c", "1100 c", "450 c", "650 c", "500 c", "350 c", "400 c",
-            "fireproof", "thermal runaway"
+            "fireproof", "thermal runaway", "incinerat", "incenerat", "incen", "inciner", "boiler tube", "combustion chamber", "afterburner", "flue"
         ]) or ("kiln" in prompt_lower and not any(k in prompt_lower for k in ["kiln-dried", "kiln dried"]))
         is_high_temp = any(w in prompt_lower for w in [
             "hot", "heat", "high temperature", "thermal", "boiling", "exhaust", "engine", "oven", "furnace", "boiler"
@@ -390,7 +390,7 @@ class NLPTranslationLayer:
         target_yield_mpa = cls._extract_regex_float(prompt_clean, r'(\d+(?:\.\d+)?)\s*(?:mpa|megapascal)')
         target_velocity_ms = cls._extract_regex_float(prompt_clean, r'(\d+(?:\.\d+)?)\s*(?:m/s|meter(?:s)? per second)')
         target_chord_mm = cls._extract_regex_float(prompt_clean, r'(\d+(?:\.\d+)?)\s*(?:mm|millimeter)')
-        target_temp_c = cls._extract_regex_float(prompt_clean, r'(-?\d+(?:\.\d+)?)\s*(?:°\s*c|celsius|deg\s*c|\bc\b)')
+        target_temp_c = cls._extract_temperature_c(prompt_clean)
         if target_temp_c is None:
             if any(w in prompt_lower for w in ["thermal runaway", "fireproof", "battery pack fireproof"]):
                 target_temp_c = 800.0
@@ -426,6 +426,9 @@ class NLPTranslationLayer:
             else:
                 ashby_key = AshbyIndex.TIE_STRENGTH
                 ashby_reasoning = "Pressure containment shell / conduit governed by hoop stress and yield burst pressure per unit mass: M = σ_y / ρ."
+        elif component_type == "high_temperature_thermal_barrier" and any(w in prompt_lower for w in ["lining", "liner", "insulat"]):
+            ashby_key = AshbyIndex.THERMAL_INSULATION
+            ashby_reasoning = "High-temperature lining that must limit heat flow while surviving the service temperature: M = 1 / λ (screened by maximum service temperature)."
         elif component_type == "thermal_insulation_barrier":
             ashby_key = AshbyIndex.THERMAL_INSULATION
             ashby_reasoning = "Thermal barrier and heat flow minimization: M = 1 / λ."
@@ -632,6 +635,20 @@ class NLPTranslationLayer:
                 ]
             }
         }
+
+    @staticmethod
+    def _extract_temperature_c(text: str) -> Optional[float]:
+        """Extract a service temperature in Celsius. Tolerates typos ('celcius'), 'degrees C', 'centigrade',
+        degrees Fahrenheit and kelvin. Returns the highest temperature mentioned (the governing case)."""
+        t = text.lower().replace("º", "°").replace("˚", "°")
+        found = []
+        for m in re.finditer(r'(-?\d+(?:[.,]\d+)?)\s*(?:°|degrees?|degs?\.?)?\s*(cel\w{0,6}|centigrade|c)\b', t):
+            found.append(float(m.group(1).replace(",", ".")))
+        for m in re.finditer(r'(-?\d+(?:[.,]\d+)?)\s*(?:°|degrees?|degs?\.?)?\s*(fahrenheit|f)\b', t):
+            found.append((float(m.group(1).replace(",", ".")) - 32.0) * 5.0 / 9.0)
+        for m in re.finditer(r'(-?\d+(?:[.,]\d+)?)\s*(?:kelvin)\b', t):
+            found.append(float(m.group(1).replace(",", ".")) - 273.15)
+        return max(found) if found else None
 
     @staticmethod
     def _extract_regex_float(text: str, pattern: str) -> Optional[float]:
