@@ -154,13 +154,21 @@ def ensure_ollama():
     if not exe:
         say("WARNING: Ollama could not be installed. The system will still run in deterministic mode.")
         return None
-    if not http_ok(OLLAMA_URL + "/api/tags"):
+    say(f"Ollama found: {exe}")
+    if http_ok(OLLAMA_URL + "/api/tags"):
+        say("Ollama service is already running.")
+    else:
         say("Starting Ollama service ...")
         subprocess.Popen([exe, "serve"], creationflags=NO_WINDOW, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(40):
             if http_ok(OLLAMA_URL + "/api/tags"):
                 break
             time.sleep(1)
+        if http_ok(OLLAMA_URL + "/api/tags"):
+            say("Ollama service started and responding.")
+        else:
+            say("WARNING: Ollama did not respond within 40 s. LLM commentary will be skipped until it is running "
+                "(rankings and costs are unaffected). Try opening the Ollama app from the Start menu.")
     return exe
 
 
@@ -169,8 +177,11 @@ def ensure_model(exe):
         with urllib.request.urlopen(OLLAMA_URL + "/api/tags", timeout=5) as r:
             names = [m.get("name", "") for m in json.loads(r.read().decode()).get("models", [])]
     except Exception:
-        names = []
-    if not any(n.split(":")[0] == MODEL.split(":")[0] for n in names):
+        say("WARNING: could not query Ollama for installed models.")
+        return
+    if any(n.split(":")[0] == MODEL.split(":")[0] for n in names):
+        say(f"Model {MODEL} is installed.")
+    else:
         say(f"Downloading model {MODEL} (about 2 GB, first run only) ...")
         run([exe, "pull", MODEL])
 
@@ -184,8 +195,10 @@ def warm_model():
             req = urllib.request.Request(OLLAMA_URL + "/api/generate", data=body,
                                          headers={"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=300).read()
-        except Exception:
-            pass
+            say(f"Model {MODEL} is loaded in memory and ready.")
+        except Exception as exc:
+            say(f"WARNING: model warm-up failed ({type(exc).__name__}); the first LLM request may be slow.")
+    say(f"Loading {MODEL} into memory in the background ...")
     threading.Thread(target=_go, daemon=True).start()
 
 
