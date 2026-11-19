@@ -76,6 +76,14 @@ class NLPTranslationLayer:
         # Distinguish food dining plates from structural cold plates, armor plates, and baseplates
         is_food_plate = bool(re.search(r'\b(?:dinner plate|eating plate|food plate|serving plate|paper plate|saucer)\b', prompt_lower))
 
+        # Heavy rock crushing / stone crusher jaw / extreme gouging abrasion plate detection
+        is_crusher_jaw = bool(re.search(
+            r'\b(?:crusher|stone crusher|jaw crusher|crusher jaw|crusher plate|jaw plate|crushing jaw|'
+            r'rock crusher|impact crusher|crushing plate|hammer mill|ball mill liner|ore chute|mining wear plate|'
+            r'grizzly bar|crushing tooth|quarry crusher)\b',
+            prompt_lower
+        )) or (any(w in prompt_lower for w in ['crusher', 'crushing', 'stone crusher', 'jaw']) and any(w in prompt_lower for w in ['hardness', 'strength', 'impact', 'rock', 'stone', 'abrasion', 'wear']))
+
         # Cutting tool / blade detection (Must precede bottle / optical glass detection)
         is_cutting_tool = bool(re.search(
             r'\b(?:knife|cutting blade|machete|sword|chisel|saw blade|scissors|shears|scraper|axe|scalpel|'
@@ -143,7 +151,9 @@ class NLPTranslationLayer:
         )
 
 
-        if is_cutting_tool:
+        if is_crusher_jaw:
+            component_type = "heavy_impact_crushing_or_abrasion_jaw"
+        elif is_cutting_tool:
             component_type = "cutting_tool_or_blade"
         elif is_pure_tension:
             component_type = "pure_tension_tie"
@@ -402,7 +412,11 @@ class NLPTranslationLayer:
         is_dewar_strut = is_cryogenic and any(w in prompt_lower for w in ["strut", "dewar support", "dewar strut", "suspension strut"]) and not any(w in prompt_lower for w in ["busbar", "thermal anchor busbar", "conductor"])
 
         # 6. Deduce Ashby Performance Index based on Physical Domain Intent
-        if is_speaker_cone:
+        is_torsion_shaft = bool(re.search(r"(drive ?shaft|propeller shaft|turbine shaft|shaft[^.]{0,40}torsion|torsion[^.]{0,40}shaft|torque[^.]{0,40}shaft|shaft[^.]{0,40}torque)", prompt_lower)) and not any(w in prompt_lower for w in ["fatigue", "flywheel", "centrifug", "burst", "shock", "cryo"])
+        if is_torsion_shaft:
+            ashby_key = AshbyIndex.SHAFT_TORSION
+            ashby_reasoning = "Shaft transmitting torque under a twist/stiffness constraint: M7 = G^(1/2) / ρ."
+        elif is_speaker_cone:
             ashby_key = AshbyIndex.PLATE_STIFFNESS
             ashby_reasoning = "Acoustic speaker cone/diaphragm requiring maximum high-frequency flexural stiffness per unit mass: M = E^(1/3) / ρ."
         elif component_type in ["pressure_vessel_or_containment", "fluid_containment_vessel", "fluid_conduit_plumbing"]:
@@ -424,6 +438,9 @@ class NLPTranslationLayer:
         elif component_type == "transparent_optical_component":
             ashby_key = AshbyIndex.PLATE_STRENGTH
             ashby_reasoning = "Optical transparency with shatter resistance: M = σ_y^(1/2) / ρ."
+        elif component_type == "heavy_impact_crushing_or_abrasion_jaw":
+            ashby_key = AshbyIndex.TIE_STRENGTH
+            ashby_reasoning = "Heavy-duty stone crusher jaw plate subject to severe gouging rock impact and abrasive wear. Governed by high yield strength, impact toughness, and austenitic work-hardening capability (such as ASTM A128 Hadfield Manganese Steel): M = σ_y / ρ."
         elif component_type == "cutting_tool_or_blade":
             ashby_key = AshbyIndex.TIE_STRENGTH
             ashby_reasoning = "Cutting tool / blade requiring maximum edge yield strength and wear resistance: M = σ_y / ρ."
@@ -431,9 +448,15 @@ class NLPTranslationLayer:
             if any(w in prompt_lower for w in ["stiff", "rigidity", "stretch", "elongat", "deflection", "modulus", "solar sail", "spoke", "tonal pitch", "acoustic"]):
                 ashby_key = AshbyIndex.TIE_STIFFNESS
                 ashby_reasoning = "Pure tensile chord or cable requiring maximum axial stiffness per unit mass: M = E / ρ."
+            elif any(w in prompt_lower for w in ["cheapest", "lowest cost", "low cost", "low-cost", "minimum cost", "cost-effective", "cost effective", "tight budget"]):
+                ashby_key = AshbyIndex.COST_NORMALIZED_TIE
+                ashby_reasoning = "Pure tensile member where cost is a co-governing objective: M9 = σ_y / (ρ · C_m)."
             else:
                 ashby_key = AshbyIndex.TIE_STRENGTH
                 ashby_reasoning = "Pure tensile chord or cable resisting yielding or plastic rupture: M = σ_y / ρ."
+        elif component_type == "rotational_drive_element" and any(w in prompt_lower for w in ["shaft", "torsion", "torsional", "torque tube", "driveshaft", "kelly bar", "spindle"]) and not any(w in prompt_lower for w in ["flywheel", "centrifug", "burst", "rotor disc", "rotor disk"]):
+            ashby_key = AshbyIndex.SHAFT_TORSION
+            ashby_reasoning = "Shaft transmitting torque under a twist/stiffness constraint: M7 = G^(1/2) / ρ."
         elif component_type == "rotational_drive_element" or (component_type == "turbine_blade_or_impeller" and any(w in prompt_lower for w in ["rpm", "centrifugal", "centrifuge", "flywheel", "disk", "runner wheel", "inducer", "pelton", "bilge", "propeller", "shear dispersion", "dispersion rotor", "ring gear", "drill turbine"])):
             ashby_key = AshbyIndex.FLYWHEEL_INERTIA
             ashby_reasoning = "High-speed rotational machinery governed by centrifugal burst limits: M = σ_y / ρ."
@@ -557,6 +580,8 @@ class NLPTranslationLayer:
                 "chemical_or_saline_exposure": is_chem_exposure,
                 "strong_acid_exposure": is_strong_acid,
                 "marine_industrial_exposure": is_marine_industrial,
+                "heavy_impact_crushing": is_crusher_jaw,
+                "extreme_wear_abrasion_required": is_crusher_jaw,
                 "heavy_infrastructure": is_heavy_infrastructure,
                 "spinal_cage": is_spinal,
                 "dental_prosthetic": is_dental,

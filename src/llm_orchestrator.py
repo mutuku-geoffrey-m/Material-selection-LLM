@@ -41,6 +41,11 @@ class LLMOrchestrator:
         self.cloud_api_key = cloud_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
         self.cloud_model = cloud_model
         self.local_model = local_model or os.getenv("LOCAL_MODEL", "llama3.2")
+        # Timeouts are configurable. A CPU-only llama3.2 needs far longer than 3 s to load and write ~250 tokens,
+        # so the old 3 s breaker made the LLM commentary fail on essentially every prompt.
+        self.local_timeout_s = float(os.getenv("EMS_LLM_TIMEOUT_S", "90"))
+        self.cloud_timeout_s = float(os.getenv("EMS_CLOUD_TIMEOUT_S", "20"))
+        self.last_llm_error: Optional[str] = None
 
     def set_mode(self, mode: str):
         """Set active generation mode."""
@@ -208,7 +213,7 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
+            with urllib.request.urlopen(req, timeout=self.cloud_timeout_s) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 cloud_text = data["candidates"][0]["content"]["parts"][0]["text"]
                 return {
@@ -467,7 +472,11 @@ Keep response strictly under 180 words. Professional engineering terminology onl
                 generation_text = f"{expert_report}\n\n### 4. Advanced Metallurgical & Microstructural Commentary (Local Ollama Engine)\n{local_output}"
                 active_engine = f"Local Standalone LLM ({self.local_model} via Ollama)"
             else:
-                generation_text = expert_report
+                generation_text = expert_report + (
+                    "\n\n> *Local LLM commentary was not appended (" + (self.last_llm_error or "no response") + "). "
+                    "The material ranking, Ashby indices and landed-cost figures above are computed deterministically "
+                    "and are not affected.*"
+                )
                 active_engine = "Autonomous Expert Reasoning Engine (Deterministic Verification)"
 
         # Append Cloud AI Arbitration Section if active
@@ -574,10 +583,12 @@ Keep response strictly under 180 words. Professional engineering terminology onl
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=3.0) as response:
+            with urllib.request.urlopen(req, timeout=self.local_timeout_s) as response:
                 result = json.loads(response.read().decode("utf-8"))
+                self.last_llm_error = None
                 return result.get("response") or result.get("choices", [{}])[0].get("text")
         except Exception as e:
+            self.last_llm_error = f"{type(e).__name__}: {str(e)[:80]}"
             return None
 
     def _call_cloud_llm(self, prompt: str) -> Optional[str]:
@@ -600,7 +611,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
                     headers={"Content-Type": "application/json"},
                     method="POST"
                 )
-                with urllib.request.urlopen(req, timeout=20.0) as response:
+                with urllib.request.urlopen(req, timeout=self.cloud_timeout_s) as response:
                     result = json.loads(response.read().decode("utf-8"))
                     return result["candidates"][0]["content"]["parts"][0]["text"]
             else:
@@ -622,7 +633,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
                     },
                     method="POST"
                 )
-                with urllib.request.urlopen(req, timeout=20.0) as response:
+                with urllib.request.urlopen(req, timeout=self.cloud_timeout_s) as response:
                     result = json.loads(response.read().decode("utf-8"))
                     return result["choices"][0]["message"]["content"]
         except Exception:

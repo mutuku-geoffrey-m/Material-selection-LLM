@@ -383,7 +383,7 @@ st.sidebar.markdown("""
 def check_cached_ollama_health(endpoint: str, model_name: str) -> dict:
     try:
         req = urllib.request.Request(f"{endpoint}/api/tags", headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=1.0) as resp:
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             models = [m.get("name") for m in data.get("models", [])]
             return {
@@ -789,7 +789,7 @@ with col_right:
             <div class="stat-grid">
                 <div class="stat-box">
                     <div class="stat-label">Ashby Index (M)</div>
-                    <div class="stat-value">{top_mat.get('score', 0):.2f}</div>
+                    <div class="stat-value">{top_mat.get('final_metric', top_mat.get('raw_score', top_mat.get('score', 0.0))):.2f}</div>
                     <div class="stat-sub">{ashby_spec.get('ashby_mathematical_formula', 'E^(1/2) / ρ')}</div>
                 </div>
                 <div class="stat-box">
@@ -804,7 +804,7 @@ with col_right:
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Raw Sourcing Cost</div>
-                    <div class="stat-value">${top_mat_data.get('cost_per_kg_usd', 0):.2f} <span style="font-size: 11px;">/ kg</span></div>
+                    <div class="stat-value">${(top_mat_data.get('cost_per_kg_usd') or top_mat_data.get('techno_economics', {}).get('raw_cost_usd_per_kg', 0.0)):.2f} <span style="font-size: 11px;">/ kg</span></div>
                     <div class="stat-sub">EOQ Model Basis</div>
                 </div>
             </div>

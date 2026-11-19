@@ -29,6 +29,8 @@ class AshbyIndex:
     THERMAL_DIFFUSIVITY = "thermal_diffusivity" # a = lambda / (rho * Cp) (Heat dissipation)
     THERMAL_CONDUCTIVITY = "thermal_conductivity" # M = lambda (Steady-state heat conduction / heat sinks)
     THERMAL_INSULATION = "thermal_insulation"     # M = 1 / lambda (Thermal barriers)
+    SHAFT_TORSION = "shaft_torsion"               # M7 = G^(1/2) / rho (Torsional shaft stiffness)
+    COST_NORMALIZED_TIE = "cost_normalized_tie"   # M9 = sigma_y / (rho * C_m) (Cost-normalized tensile tie)
     FATIGUE_EFFICIENCY = "fatigue_efficiency"   # M = sigma_fatigue / rho (Cyclic loading)
 
 
@@ -104,6 +106,18 @@ INDEX_DESCRIPTIONS = {
         "name": "Thermal Insulation Resistance",
         "formula": "1 / λ",
         "primary_application": "Thermal barrier coatings, furnace insulations, cryogenic insulation",
+        "maximize": True
+    },
+    AshbyIndex.SHAFT_TORSION: {
+        "name": "Shaft in Torsion (Stiffness-Driven)",
+        "formula": "G^(1/2) / ρ",
+        "primary_application": "Drive shafts, propeller shafts, couplings, drill strings, torque tubes",
+        "maximize": True
+    },
+    AshbyIndex.COST_NORMALIZED_TIE: {
+        "name": "Cost-Normalized Tie in Tension",
+        "formula": "σ_y / (ρ · C_m)",
+        "primary_application": "Budget-driven tensile members where strength per unit mass AND per dollar both matter",
         "maximize": True
     },
     AshbyIndex.FATIGUE_EFFICIENCY: {
@@ -194,6 +208,21 @@ def calculate_ashby_index(material: Dict[str, Any], index_key: str, use_printed_
     elif index_key == AshbyIndex.FATIGUE_EFFICIENCY:
         return sigma_fatigue_mpa / (rho / 1000.0)
 
+    elif index_key == AshbyIndex.SHAFT_TORSION:
+        # M7 = G^(1/2) / (rho/1000), G in GPa. Falls back to E / (2(1+nu)) when G is not tabulated.
+        g_gpa = material.get("shear_modulus_gpa")
+        if not g_gpa or g_gpa <= 0:
+            nu = material.get("poissons_ratio") or 0.3
+            g_gpa = E_gpa / (2.0 * (1.0 + nu))
+        return math.sqrt(g_gpa) / (rho / 1000.0)
+
+    elif index_key == AshbyIndex.COST_NORMALIZED_TIE:
+        # M9 = sigma_y / (rho/1000 * C_m), C_m = raw material price in USD/kg
+        c_m = (material.get("techno_economics") or {}).get("raw_cost_usd_per_kg") or material.get("cost_per_kg_usd") or 0.0
+        if c_m <= 0:
+            return 0.0
+        return sigma_y_mpa / ((rho / 1000.0) * c_m)
+
     else:
         # Default to beam stiffness
         return (math.sqrt(E_gpa) / (rho / 1000.0))
@@ -275,7 +304,8 @@ def rank_materials(
             mat_key = "Alumina_Ceramic"
 
         # Check FDM filter
-        is_fdm = mat["fdm_printability"]["ease_of_printing"] != "Not FDM Printable"
+        fdm_info = mat.get("fdm_printability") or {}
+        is_fdm = fdm_info.get("ease_of_printing", "Not FDM Printable") != "Not FDM Printable"
         if fdm_only and not is_fdm:
             continue
 
@@ -369,6 +399,18 @@ def rank_materials(
         # Check Chemical & Coolant Corrosion Filter (Disqualify reactive Magnesium in coolants/chemicals)
         if (chemical_exposure or "coolant" in prompt_lower) and ("Magnesium" in mat.get("family", "") or "Magnesium" in mat.get("name", "")):
             continue
+
+        # Heavy Rock Crushing / Stone Crusher Jaw Integrity Filter
+        # Rock crushing involves severe compressive crushing loads, gouging impact, and rock abrasion (quartz/granite).
+        # Soft alloys (Magnesium, Aluminum, Brass/Bronze) and unreinforced polymers suffer catastrophic crushing failure or severe smearing.
+        is_rock_crushing = any(w in prompt_lower for w in ["crusher", "stone crusher", "jaw crusher", "crusher jaw", "crushing jaw", "rock crusher", "jaw plate", "crushing plate", "hammer mill"])
+        if is_rock_crushing:
+            fam = mat.get("family", "")
+            if any(w in fam for w in ["Magnesium", "Aluminum", "Copper", "Brass", "Thermoplastic", "Polymer", "Elastomer"]):
+                continue
+            # Non-hardened mild structural steels without sufficient yield/toughness cannot sustain rock crushing
+            if mat.get("yield_strength", 0) < 300.0:
+                continue
 
         mat_eval = dict(mat)
 
@@ -553,7 +595,22 @@ def rank_materials(
 
         # Cutting tool / edge hardness factor
         cutting_factor = 1.0
-        if cutting_edge_hardness_required:
+        if is_rock_crushing:
+            # Hadfield Austenitic Manganese Steel (ASTM A128) is the global gold standard for crusher jaws
+            # because its austenitic matrix work-hardens dynamically under rock impact from 230 HB to 550+ HB
+            if "Hadfield" in mat.get("name", "") or "A128" in mat.get("name", "") or "Manganese" in mat.get("name", ""):
+                cutting_factor = 160.0
+            elif "Hardox" in mat.get("name", ""):
+                cutting_factor = 35.0
+            elif "A532" in mat.get("name", "") or "High-Chromium" in mat.get("name", ""):
+                crushing_factor = 30.0
+            elif mat_key in ["AISI_S7_Shock_Resisting_Tool_Steel", "AISI_4340_Quenched_Tempered", "AISI_D2_Cold_Work_Tool_Steel"]:
+                cutting_factor = 25.0
+            elif any(w in mat.get("family", "") for w in ["Alloy Steel", "Tool Steel"]):
+                cutting_factor = 15.0
+            else:
+                cutting_factor = 1.0
+        elif cutting_edge_hardness_required:
             if any(w in mat.get("family", "") for w in ["Thermoplastic", "Polymer", "Elastomer"]):
                 cutting_factor = 0.0001  # Polymers cannot function as rock saws or cutting blades
             elif mat_key in ["Alloy_Steel_4140", "4140_Steel"]:

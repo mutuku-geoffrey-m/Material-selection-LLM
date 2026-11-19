@@ -25,7 +25,7 @@ While classical selection methods rely on manual two-dimensional Ashby charts, t
 This software system, developed as our final year engineering project, addresses this problem through a decoupled architecture:
 1. **Natural Language Translation:** A parser extracts mechanical requirements (load type, geometry, temperature limits, chemical exposures, and industry standards) from technical prompts.
 2. **Boolean Physical Gating:** Filters out materials that fail hard physical constraints (e.g., optical transparency, cryogenic ductile-to-brittle limits, or non-magnetic requirements).
-3. **Deterministic Ashby Calculation Engine:** Calculates analytical Michael F. Ashby performance indices across an expanded, unit-normalized database of 1,470 standardized engineering materials using pure numerical formulas in Python.
+3. **Deterministic Ashby Calculation Engine:** Calculates analytical Michael F. Ashby performance indices across an expanded, unit-normalized database of 1,490 standardized engineering materials using pure numerical formulas in Python.
 4. **Techno-Economic Sourcing & Logistics Module:** Calculates the realistic Delivered Duty Paid (DDP) cost to Nairobi via Kilindini Port (Mombasa), accounting for maritime freight, East African Community Common External Tariffs (EAC CET), Import Declaration Fees, Railway Development Levies, VAT, Mombasa port handling, and Standard Gauge Railway (SGR) rail haulage. It also models stochastic safety stock and Wilson-Harris Economic Order Quantities.
 5. **TOPSIS Multi-Criteria Decision Analysis:** Ranks candidate materials by balancing mechanical performance, landed cost, lead time, and supply availability using vector-normalized TOPSIS.
 6. **Local LLM Synthesis:** Uses a local offline language model (`llama3.2` running via Ollama) to synthesize practical machining, heat-treatment, and failure-prevention notes based on verified data sheets retrieved from a local ChromaDB store.
@@ -48,8 +48,8 @@ The calculation engine implements analytical Ashby indices for primary mechanica
 | $M_6$ | Plate in Bending | Minimum mass under plate yield/puncture load | $\sigma_y^{1/2} / \rho$ |
 | $M_7$ | Shaft in Torsion | Minimum mass under torsional twist constraint | $G^{1/2} / \rho$ |
 | $M_8$ | Elastic Spring | Maximum elastic strain energy storage per unit mass | $\sigma_y^2 / (E \rho)$ |
-| $M_9$ | Thermal Conductor | Steady-state heat conduction per unit mass | $\lambda / \rho$ |
-| $M_{10}$ | Cost-Normalized Tie | Minimum material cost under tensile load | $\sigma_y / (\rho C_m)$ |
+| $M_9$ | Cost-Normalized Tie | Minimum material cost under tensile load | $\sigma_y / (\rho C_m)$ |
+| $M_{10}$ | Thermal Conductor | Maximum steady-state heat conduction | $\lambda$ |
 
 ### 2.2 Incoterms 2020 Landed Cost Model (Mombasa to Nairobi)
 
@@ -58,7 +58,7 @@ The delivered procurement cost per kilogram ($C_{\text{DDP}}$) delivered to fact
 $$C_{\text{DDP}} = C_{\text{CIF}} + \text{Tariff}_{\text{EAC}} + \text{IDF} + \text{RDL} + \text{VAT} + \text{Port}_{\text{THC}} + \text{Inland}_{\text{SGR}} + \text{Clearance}_{\text{broker}}$$
 
 Where:
-- $C_{\text{CIF}} = C_{\text{EXW}} \cdot \gamma_{\text{form}} + C_{\text{freight}} + C_{\text{insurance}}$ (with marine cargo insurance at 0.40% ad valorem on 110% CIF under Institute Cargo Clauses A).
+- $C_{\text{CIF}} = C_{\text{EXW}} \cdot \gamma_{\text{form}} + C_{\text{freight}} + C_{\text{insurance}}$ (with marine cargo insurance at 0.40% ad valorem on 110% of (FOB + freight) under Institute Cargo Clauses A).
 - $\text{IDF} = 0.025 \times C_{\text{CIF}}$ (Import Declaration Fee, 2.5% under the Kenya Miscellaneous Fees and Levies Act).
 - $\text{RDL} = 0.020 \times C_{\text{CIF}}$ (Railway Development Levy, 2.0% ad valorem).
 - $\text{Tariff}_{\text{EAC}}$ follows the EAC Common External Tariff (CET) 4-band structure: 0% for primary raw materials and capital goods, 10% for intermediate goods not available locally, 25% for intermediate goods available in the region, and 35% for finished products.
@@ -92,11 +92,8 @@ Where:
 ├── .streamlit/
 │   └── config.toml            # Workbench theme and server configuration
 ├── data/
-│   ├── materials_catalog.json           # Curated database of 1,470 engineering materials
-│   ├── engineering_intent_dataset.json   # Intent classification dataset
-│   ├── instruction_tuning_dataset.jsonl # Instruction-tuning dataset
-│   ├── build_dataset.py                 # Dataset assembly script
-│   └── generate_instruction_dataset.py  # Data formatting utilities
+│   ├── materials_catalog.json           # Curated database of 1,490 engineering materials
+│   └── engineering_intent_dataset.json   # Intent classification dataset
 ├── knowledge_base/                      # Technical documentation and standards
 │   ├── ashby_methodology.md
 │   ├── metals_and_alloys_selection.md
@@ -106,8 +103,19 @@ Where:
 │   ├── polymer_degradation_water_uv.md
 │   ├── fdm_additive_manufacturing_constraints.md
 │   └── materials_data_sheets.md
+├── launcher/
+│   ├── launcher.py                      # One-click setup and start script (source of EMS-OS.exe)
+│   └── build_exe.bat                    # Builds EMS-OS.exe with PyInstaller
+├── Start_EMS-OS.bat                     # Fallback launcher (needs Python installed)
+├── models/
+│   └── nlp_intent_model.json            # Trained intent classifier used by the parser
 ├── scripts/
-│   └── build_materials_catalog.py       # Catalog generator and normalizer
+│   ├── build_materials_catalog.py       # Catalog generator and normalizer
+│   └── run_benchmark_full_pipeline.py   # Runs the 100 scenarios through the app pipeline to CSV
+├── tests/
+│   ├── test_ashby_tolerance.py          # Ashby indices vs. reference formulas (1e-5 tolerance)
+│   ├── test_topsis_sensitivity.py       # TOPSIS weight-sensitivity analysis
+│   └── test_100_benchmarks.py           # 100-scenario functional and latency benchmark
 └── src/
     ├── __init__.py
     ├── ashby_engine.py       # Deterministic continuum mechanics equations
@@ -121,6 +129,18 @@ Where:
     ├── semantic_router.py    # Query intent routing
     └── train_nlp.py          # Intent classification training
 ```
+
+---
+
+## 3a. Quick Start (Windows, one click)
+
+Double-click **`EMS-OS.exe`** (or `Start_EMS-OS.bat` if the exe has not been built). On the first run it installs whatever is missing (Python 3.12, Ollama, the project dependencies and the `llama3.2` model), creates an `EMS-OS` shortcut on the Desktop and opens the workbench at `http://localhost:8501`. Later runs, from the exe or the shortcut, only start the required services and open the browser. To rebuild the exe, run `launcher\build_exe.bat`.
+
+Timeouts for the optional language-model features are configurable in `.env`: `EMS_LLM_TIMEOUT_S` (local commentary, default 90), `EMS_ROUTER_TIMEOUT_S` (intent router, default 20) and `EMS_CLOUD_TIMEOUT_S` (cloud arbitration, default 20). Rankings and landed-cost figures are computed deterministically and do not depend on them.
+
+Cloud/second-opinion arbitration triggers automatically when the top two candidates are within 8% on the governing Ashby index; it uses the Gemini key if one is set in `.env`, otherwise the local model.
+
+Run the tests with `python -m unittest discover -s tests`.
 
 ---
 
@@ -162,6 +182,13 @@ Copy `.env.example` to `.env`:
 cp .env.example .env
 ```
 The application runs completely offline using the local Ollama instance (`http://localhost:11434`). If you wish to test cloud model arbitration, you can optionally provide an API key in `.env`.
+
+---
+
+### Troubleshooting
+- **No LLM commentary in the report:** the report says why. Check that Ollama is running (`ollama list`) and that `llama3.2` is installed; the first request after a cold start can be slow, so raise `EMS_LLM_TIMEOUT_S` in `.env` if needed. Rankings and costs are unaffected.
+- **Port 8501 busy:** set `STREAMLIT_SERVER_PORT` in `.env` or close the other Streamlit window.
+- **Launcher problems:** see `launcher.log` in the project folder.
 
 ---
 
@@ -210,7 +237,7 @@ For the natural language translation layer to extract accurate boundary conditio
    - Temperature ranges (e.g. *cryogenic -196 °C, ambient, or high temperatures > 400 °C*).
    - Fluid exposure (e.g. *submerged in river sediment, marine saline water, industrial cutting fluids, acids, or vacuum*).
 4. **Manufacturing Process:**
-   - Universal search across all 1,470 materials (metals, polymers, composites, ceramics) or restricted to *FDM Additive Manufacturing* filaments or *CNC Machining*.
+   - Universal search across all 1,490 materials (metals, polymers, composites, ceramics) or restricted to *FDM Additive Manufacturing* filaments or *CNC Machining*.
 5. **Governing Standards (Optional):**
    - E.g. *ASTM E466, ASTM A36, ISO 527, ASME Section VIII*.
 
@@ -243,7 +270,7 @@ Once executed, the right panel displays the engineering analysis:
 
 #### Sidebar Utilities
 - **Design Cases Manager:** Create new design cases with **"+ New Design Case"** or switch between previous cases. Each case preserves its own independent prompt, inputs, and results.
-- **Material Database Inspector:** Select any material from the 1,470-grade database to inspect its standardized mechanical properties, thermal limits, and raw cost.
+- **Material Database Inspector:** Select any material from the 1,490-grade database to inspect its standardized mechanical properties, thermal limits, and raw cost.
 
 ### 6.3 Sample Open-Ended Prompts to Try
 
