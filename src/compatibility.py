@@ -130,3 +130,22 @@ def marine_service(prompt: str) -> bool:
 def is_high_strength_aluminium_series(entry: Dict) -> bool:
     """2xxx and 7xxx aluminium grades are prone to exfoliation and stress-corrosion cracking in seawater."""
     return bool(_HIGH_STRENGTH_SERIES.search(str(entry.get("name", "")).lower()))
+
+
+# Continuous service limits (degrees Celsius) applied when a catalogue record gives no explicit limit.
+_FAMILY_SERVICE_LIMIT_C = (
+    ("nickel_alloy", 700.0), ("titanium", 450.0), ("stainless_steel", 600.0), ("cast_iron", 400.0),
+    ("steel", 450.0), ("copper", 350.0), ("aluminium", 180.0), ("magnesium", 150.0),
+)
+
+
+def service_limit_c(record: Dict) -> float:
+    """Maximum continuous service temperature: catalogue value, else a family default, else the heat-deflection
+    temperature, else 350 degrees Celsius."""
+    explicit = record.get("max_service_temp_c")
+    if explicit:
+        return float(explicit)
+    for family, limit in _FAMILY_SERVICE_LIMIT_C:
+        if _in_family(record, family):
+            return limit
+    return float(record.get("heat_deflection_temp") or 350.0)

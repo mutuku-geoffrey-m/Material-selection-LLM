@@ -222,9 +222,9 @@ st.markdown("""
     /* Status Badge */
     .badge-verified {
         display: inline-block;
-        background-color: rgba(46, 107, 79, 0.08);
-        border: 1px solid rgba(46, 107, 79, 0.30);
-        color: #2e6b4f;
+        background-color: color-mix(in srgb, var(--success) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
+        color: var(--success);
         padding: 2px 7px;
         border-radius: 3px;
         font-size: 11px;
@@ -234,8 +234,8 @@ st.markdown("""
 
     .badge-arbitrated {
         display: inline-block;
-        background-color: rgba(31, 58, 95, 0.08);
-        border: 1px solid rgba(31, 58, 95, 0.25);
+        background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
         color: #4a6c96;
         padding: 2px 7px;
         border-radius: 3px;
@@ -290,14 +290,14 @@ st.markdown("""
 
     .stButton > button[kind="primary"] {
         background-color: var(--accent) !important;
-        border: 1px solid #2d5080 !important;
+        border: 1px solid var(--accent-hover) !important;
         color: #ffffff !important;
         font-weight: 600 !important;
     }
 
     .stButton > button[kind="primary"]:hover {
         background-color: var(--accent-hover) !important;
-        border-color: #2d5080 !important;
+        border-color: var(--accent-hover) !important;
     }
 
     /* Data Table Styling */
@@ -343,8 +343,70 @@ st.markdown("""
         border-radius: 4px !important;
         font-size: 12px !important;
     }
+
+    .stApp, .stApp p, .stApp li, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 { color: var(--ink); }
+    [data-testid="stCaptionContainer"], .stApp small { color: var(--ink-subtle); }
+    [data-testid="stMarkdownContainer"] table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+    [data-testid="stMarkdownContainer"] th, [data-testid="stMarkdownContainer"] td {
+        border: 1px solid var(--hairline); padding: 6px 10px; font-size: 12px; vertical-align: top; color: var(--ink); background: var(--surface-1);
+    }
+    [data-testid="stMarkdownContainer"] th { background: var(--surface-3); font-weight: 600; }
+    .table-wrap { max-width: 100%; overflow-x: auto; margin-bottom: 12px; }
+    .ems-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+    .ems-table th, .ems-table td { border: 1px solid var(--hairline); padding: 6px 10px; text-align: left; vertical-align: top; color: var(--ink); background: var(--surface-1); }
+    .ems-table th { background: var(--surface-3); font-weight: 600; }
+    [data-baseweb="popover"] *, [data-baseweb="menu"] *, [role="listbox"] * { background-color: var(--surface-1); color: var(--ink); }
+    [data-baseweb="select"] * { color: var(--ink); }
+    .stCheckbox label, .stRadio label, .stToggle label, .stNumberInput label, .stSelectbox label { color: var(--ink); }
+    .stNumberInput input { background-color: var(--surface-1); color: var(--ink); }
 </style>
 """, unsafe_allow_html=True)
+
+dark_mode = st.sidebar.toggle("Dark mode", key="dark_mode")
+if dark_mode:
+    st.markdown("""
+<style>
+    :root {
+        --canvas: #12161b;
+        --surface-1: #1a2027;
+        --surface-2: #202832;
+        --surface-3: #2a3440;
+        --hairline: #323d4a;
+        --hairline-strong: #46525f;
+        --ink: #e6eaef;
+        --ink-muted: #c3cbd5;
+        --ink-subtle: #9ba6b2;
+        --ink-tertiary: #7d8895;
+        --accent: #4a78b0;
+        --accent-hover: #5b8cc6;
+        --success: #5fae8a;
+        --warning: #d1a24a;
+        --danger: #d98585;
+    }
+    [data-testid="stHeader"] { background-color: var(--canvas) !important; }
+    textarea, input { color: var(--ink) !important; }
+</style>
+""", unsafe_allow_html=True)
+
+
+def render_table(df) -> None:
+    """Render a DataFrame as an HTML table that scrolls horizontally inside its container and follows the theme."""
+    html = df.to_html(index=False, escape=True, classes="ems-table", border=0, na_rep="",
+                      float_format=lambda v: f"{v:,.2f}")
+    st.markdown('<div class="table-wrap">' + "".join(line.strip() for line in html.split("\n")) + "</div>",
+                unsafe_allow_html=True)
+
+
+def themed_figure(fig, dark: bool):
+    """Apply the light or dark palette to a Plotly figure at display time."""
+    ink, subtle, grid, surface, line = (("#e6eaef", "#9ba6b2", "#2f3945", "#1a2027", "#46525f") if dark
+                                        else ("#1c2733", "#5b6775", "#e3e6eb", "#ffffff", "#d9dde3"))
+    fig.update_layout(paper_bgcolor=surface, plot_bgcolor=surface, font=dict(color=ink),
+                      legend=dict(bgcolor=surface, bordercolor=line, font=dict(color=ink)))
+    fig.update_xaxes(gridcolor=grid, linecolor=line, zerolinecolor=grid, tickfont=dict(color=subtle), title_font=dict(color=ink))
+    fig.update_yaxes(gridcolor=grid, linecolor=line, zerolinecolor=grid, tickfont=dict(color=subtle), title_font=dict(color=ink))
+    return fig
+
 
 
 @st.cache_resource
@@ -372,9 +434,9 @@ current_session = st.session_state.engineering_sessions[st.session_state.active_
 
 # Sidebar: System Infrastructure & Material Catalog
 st.sidebar.markdown("""
-<div style="padding: 4px 0 16px 0; border-bottom: 1px solid #d9dde3; margin-bottom: 16px;">
-    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #1c2733;">EMS-OS</div>
-    <div style="font-size: 11px; color: #5b6775;">Engineering Materials Selection System</div>
+<div style="padding: 4px 0 16px 0; border-bottom: 1px solid var(--hairline); margin-bottom: 16px;">
+    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--ink);">EMS-OS</div>
+    <div style="font-size: 11px; color: var(--ink-subtle);">Engineering Materials Selection System</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -386,12 +448,12 @@ def check_cached_ollama_health(endpoint: str, model_name: str) -> dict:
 
 
 # Engine Selection
-st.sidebar.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 6px;'>Inference Route</div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: none; color: var(--ink-subtle); margin-bottom: 6px;'>Inference Route</div>", unsafe_allow_html=True)
 
 mode_choice = st.sidebar.selectbox(
     "Inference Route",
     [
-        "Local language model (llama3.2:1b via Ollama) [Primary]",
+        "Local language model (llama3.2:3b via Ollama) [Primary]",
         "Deterministic rule-based solver (no language model)",
         "Cloud API (Google Gemini / OpenAI)"
     ],
@@ -400,7 +462,7 @@ mode_choice = st.sidebar.selectbox(
 )
 
 mode_map = {
-    "Local language model (llama3.2:1b via Ollama) [Primary]": LLMOrchestrator.MODE_LOCAL,
+    "Local language model (llama3.2:3b via Ollama) [Primary]": LLMOrchestrator.MODE_LOCAL,
     "Deterministic rule-based solver (no language model)": LLMOrchestrator.MODE_AUTONOMOUS_EXPERT,
     "Cloud API (Google Gemini / OpenAI)": LLMOrchestrator.MODE_CLOUD
 }
@@ -411,15 +473,15 @@ ollama_health = check_cached_ollama_health(ollama_endpoint, orchestrator.local_m
 
 # Status strip in sidebar
 if not ollama_health["online"]:
-    state_color, state_line, state_hint = "#9b2c2c", "Ollama service: not running", "Start it with <code>ollama serve</code> or reopen the launcher."
+    state_color, state_line, state_hint = "var(--danger)", "Ollama service: not running", "Start it with <code>ollama serve</code> or reopen the launcher."
 elif not ollama_health["target_model_ready"]:
-    state_color, state_line, state_hint = "#8a5a14", "Ollama service: running, model not installed", f"Install it with <code>ollama pull {orchestrator.local_model}</code>."
+    state_color, state_line, state_hint = "var(--warning)", "Ollama service: running, model not installed", f"Install it with <code>ollama pull {orchestrator.local_model}</code>."
 else:
-    state_color, state_line, state_hint = "#2e6b4f", "Ollama service: ready", f"Model {orchestrator.local_model} is installed."
+    state_color, state_line, state_hint = "var(--success)", "Ollama service: ready", f"Model {orchestrator.local_model} is installed."
 st.sidebar.markdown(f"""
-<div style="background-color: #f8f9fb; border: 1px solid #d9dde3; border-left: 3px solid {state_color}; border-radius: 3px; padding: 8px 10px; margin-bottom: 16px;">
-    <div style="font-size: 12px; color: #1c2733; font-weight: 600;">{state_line}</div>
-    <div style="font-size: 11px; color: #5b6775; margin-top: 3px;">{state_hint}</div>
+<div style="background-color: var(--surface-2); border: 1px solid var(--hairline); border-left: 3px solid {state_color}; border-radius: 3px; padding: 8px 10px; margin-bottom: 16px;">
+    <div style="font-size: 12px; color: var(--ink); font-weight: 600;">{state_line}</div>
+    <div style="font-size: 11px; color: var(--ink-subtle); margin-top: 3px;">{state_hint}</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -435,12 +497,12 @@ with st.sidebar.expander("Cloud Internet Arbitration (Gemini)", expanded=False):
     )
     if gemini_key:
         orchestrator.cloud_api_key = gemini_key
-        st.markdown("<span style='font-size: 11px; color: #2e6b4f;'>Connected for live internet tie-breaking.</span>", unsafe_allow_html=True)
+        st.markdown("<span style='font-size: 11px; color: var(--success);'>Connected for live internet tie-breaking.</span>", unsafe_allow_html=True)
 
-st.sidebar.markdown("<div style='border-top: 1px solid #d9dde3; margin: 16px 0;'></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='border-top: 1px solid var(--hairline); margin: 16px 0;'></div>", unsafe_allow_html=True)
 
 # Design Sessions Manager
-st.sidebar.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;'>Design Cases & History</div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: none; color: var(--ink-subtle); margin-bottom: 8px;'>Design Cases & History</div>", unsafe_allow_html=True)
 
 if st.sidebar.button("+ New Design Case", use_container_width=True):
     new_id = str(uuid.uuid4())[:8]
@@ -476,7 +538,7 @@ if len(st.session_state.engineering_sessions) > 1:
         st.session_state.active_session_id = fresh_id
         st.rerun()
 
-st.sidebar.markdown("<div style='border-top: 1px solid #d9dde3; margin: 16px 0;'></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='border-top: 1px solid var(--hairline); margin: 16px 0;'></div>", unsafe_allow_html=True)
 
 # Catalog Property Inspector
 with st.sidebar.expander("Material Database Inspector", expanded=False):
@@ -495,12 +557,12 @@ with st.sidebar.expander("Material Database Inspector", expanded=False):
         - **Raw Cost:** `${m_info.get('cost_per_kg_usd', 0):.2f} / kg`
         """)
 
-st.sidebar.markdown("<div style='border-top: 1px solid #d9dde3; margin: 16px 0;'></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='border-top: 1px solid var(--hairline); margin: 16px 0;'></div>", unsafe_allow_html=True)
 st.sidebar.markdown(f"""
-<div style="font-size: 11px; color: #7a8593; line-height: 1.5;">
-    Indexed Materials: <strong style="color: #5b6775;">{len(MATERIALS_DATABASE):,}</strong><br>
-    Standards: <strong style="color: #5b6775;">ASTM / ISO / ASME / DIN / JIS</strong><br>
-    Optimization: <strong style="color: #5b6775;">Ashby Multi-Objective</strong>
+<div style="font-size: 11px; color: var(--ink-tertiary); line-height: 1.5;">
+    Indexed Materials: <strong style="color: var(--ink-subtle);">{len(MATERIALS_DATABASE):,}</strong><br>
+    Standards: <strong style="color: var(--ink-subtle);">ASTM / ISO / ASME / DIN / JIS</strong><br>
+    Optimization: <strong style="color: var(--ink-subtle);">Ashby Multi-Objective</strong>
 </div>
 """, unsafe_allow_html=True)
 
@@ -515,16 +577,16 @@ st.markdown(f"""
     <div style="display: flex; align-items: center; gap: 14px;">
         <div class="telemetry-item">
             <span class="{'telemetry-dot-online' if ollama_health['online'] else 'telemetry-dot-offline'}"></span>
-            <span>Ollama: <strong style="color: #3c4a5a;">{orchestrator.local_model}</strong></span>
+            <span>Ollama: <strong style="color: var(--ink-muted);">{orchestrator.local_model}</strong></span>
         </div>
         <div class="telemetry-item">
-            <span>Catalog: <strong style="color: #3c4a5a;">{len(MATERIALS_DATABASE):,} Grades</strong></span>
+            <span>Catalog: <strong style="color: var(--ink-muted);">{len(MATERIALS_DATABASE):,} Grades</strong></span>
         </div>
         <div class="telemetry-item">
-            <span>Methodology: <strong style="color: #3c4a5a;">Ashby Continuum</strong></span>
+            <span>Methodology: <strong style="color: var(--ink-muted);">Ashby Continuum</strong></span>
         </div>
         <div class="telemetry-item">
-            <span>Sourcing: <strong style="color: #3c4a5a;">Wilson-Harris EOQ</strong></span>
+            <span>Sourcing: <strong style="color: var(--ink-muted);">Wilson-Harris EOQ</strong></span>
         </div>
     </div>
 </div>
@@ -532,14 +594,15 @@ st.markdown(f"""
 
 
 # Two-Pane Workbench Layout
-col_left, col_right = st.columns([4, 6], gap="medium")
+col_left = st.container()
+col_right = st.container()
 
 # LEFT PANE: Engineering Specification & Sizing Console
 with col_left:
     st.markdown("""
     <div class="wb-card-header">
         <span>Design Specification & Boundary Constraints</span>
-        <span style="font-family: Consolas, "Courier New", monospace; font-size: 10px; color: #7a8593;">Design Specification</span>
+        <span style="font-family: Consolas, "Courier New", monospace; font-size: 10px; color: var(--ink-tertiary);">Design Specification</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -603,7 +666,7 @@ with col_left:
     current_session["prompt"] = user_prompt
 
     # Structured Parameter Adjustments
-    st.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin: 12px 0 8px 0;'>Boundary Condition Gating</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: none; color: var(--ink-subtle); margin: 12px 0 8px 0;'>Boundary Condition Gating</div>", unsafe_allow_html=True)
 
     c_bnd1, c_bnd2 = st.columns(2)
     with c_bnd1:
@@ -710,25 +773,25 @@ with col_right:
         <div class="wb-card">
             <div class="wb-card-header">
                 <span>Multi-Objective Continuum Evaluation Engine</span>
-                <span style="font-family: Consolas, "Courier New", monospace; font-size: 10px; color: #7a8593;">AWAITING EXECUTION</span>
+                <span style="font-family: Consolas, "Courier New", monospace; font-size: 10px; color: var(--ink-tertiary);">AWAITING EXECUTION</span>
             </div>
             <div style="padding: 24px 8px; text-align: center;">
-                <div style="font-size: 16px; font-weight: 600; color: #1c2733; margin-bottom: 8px;">System ready</div>
-                <div style="font-size: 13px; color: #5b6775; max-width: 500px; margin: 0 auto 20px auto; line-height: 1.5;">
+                <div style="font-size: 16px; font-weight: 600; color: var(--ink); margin-bottom: 8px;">System ready</div>
+                <div style="font-size: 13px; color: var(--ink-subtle); max-width: 500px; margin: 0 auto 20px auto; line-height: 1.5;">
                     Select an engineering benchmark specification on the left or enter a custom design brief, then execute multi-objective optimization.
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: left; max-width: 580px; margin: 0 auto;">
-                    <div style="background-color: #ffffff; border: 1px solid #d9dde3; border-radius: 4px; padding: 12px;">
-                        <div style="font-size: 11px; font-weight: 600; color: #3c4a5a; text-transform: none; margin-bottom: 4px;">Phase 1: Mechanics</div>
-                        <div style="font-size: 11px; color: #5b6775;">Continuum loading derivations and governing Ashby index assignment.</div>
+                    <div style="background-color: var(--surface-1); border: 1px solid var(--hairline); border-radius: 4px; padding: 12px;">
+                        <div style="font-size: 11px; font-weight: 600; color: var(--ink-muted); text-transform: none; margin-bottom: 4px;">Phase 1: Mechanics</div>
+                        <div style="font-size: 11px; color: var(--ink-subtle);">Continuum loading derivations and governing Ashby index assignment.</div>
                     </div>
-                    <div style="background-color: #ffffff; border: 1px solid #d9dde3; border-radius: 4px; padding: 12px;">
-                        <div style="font-size: 11px; font-weight: 600; color: #3c4a5a; text-transform: none; margin-bottom: 4px;">Phase 2: Screening</div>
-                        <div style="font-size: 11px; color: #5b6775;">Pareto boundary filtering across the standardized materials catalogue.</div>
+                    <div style="background-color: var(--surface-1); border: 1px solid var(--hairline); border-radius: 4px; padding: 12px;">
+                        <div style="font-size: 11px; font-weight: 600; color: var(--ink-muted); text-transform: none; margin-bottom: 4px;">Phase 2: Screening</div>
+                        <div style="font-size: 11px; color: var(--ink-subtle);">Pareto boundary filtering across the standardized materials catalogue.</div>
                     </div>
-                    <div style="background-color: #ffffff; border: 1px solid #d9dde3; border-radius: 4px; padding: 12px;">
-                        <div style="font-size: 11px; font-weight: 600; color: #3c4a5a; text-transform: none; margin-bottom: 4px;">Phase 3: Sourcing</div>
-                        <div style="font-size: 11px; color: #5b6775;">Wilson-Harris EOQ batch sizing, MOQ gating, and landed cost analytics.</div>
+                    <div style="background-color: var(--surface-1); border: 1px solid var(--hairline); border-radius: 4px; padding: 12px;">
+                        <div style="font-size: 11px; font-weight: 600; color: var(--ink-muted); text-transform: none; margin-bottom: 4px;">Phase 3: Sourcing</div>
+                        <div style="font-size: 11px; color: var(--ink-subtle);">Wilson-Harris EOQ batch sizing, MOQ gating, and landed cost analytics.</div>
                     </div>
                 </div>
             </div>
@@ -756,9 +819,9 @@ with col_right:
             </div>
             <div class="material-headline-name">{top_mat['name']}</div>
             <div class="material-headline-sub">
-                Family: <strong style="color: #3c4a5a;">{top_mat.get('family', 'Standard Alloy')}</strong> &nbsp;|&nbsp; 
-                Governing Index: <strong style="color: #3c4a5a;">{ashby_spec.get('primary_governing_ashby_index', 'beam_stiffness')}</strong> &nbsp;|&nbsp;
-                Route: <strong style="color: #3c4a5a;">{bnd_spec.get('manufacturing_process', 'Universal Multi-Process')}</strong>
+                Family: <strong style="color: var(--ink-muted);">{top_mat.get('family', 'Standard Alloy')}</strong> &nbsp;|&nbsp; 
+                Governing Index: <strong style="color: var(--ink-muted);">{ashby_spec.get('primary_governing_ashby_index', 'beam_stiffness')}</strong> &nbsp;|&nbsp;
+                Route: <strong style="color: var(--ink-muted);">{bnd_spec.get('manufacturing_process', 'Universal Multi-Process')}</strong>
             </div>
             <div class="stat-grid">
                 <div class="stat-box">
@@ -790,10 +853,10 @@ with col_right:
             st.markdown("""
             <div class="wb-card-header" style="margin-top: 12px;">
                 <span>Ashby Pareto Selection Space (Log-Log Coordinate Plane)</span>
-                <span style="font-family: Consolas, "Courier New", monospace; font-size: 10px; color: #7a8593;">Figure 1</span>
+                <span style="font-family: Consolas, "Courier New", monospace; font-size: 10px; color: var(--ink-tertiary);">Figure 1</span>
             </div>
             """, unsafe_allow_html=True)
-            st.plotly_chart(current_session["chart_fig"], use_container_width=True, key=f"chart_{st.session_state.active_session_id}")
+            st.plotly_chart(themed_figure(current_session["chart_fig"], dark_mode), use_container_width=True, key=f"chart_{st.session_state.active_session_id}")
 
         # Multi-Tab Diagnostic Deep Dive
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -806,7 +869,7 @@ with col_right:
 
         with tab1:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: var(--ink-subtle); margin-bottom: 8px;">
                 Analytical Derivation & Manufacturing Directives
             </div>
             """, unsafe_allow_html=True)
@@ -814,7 +877,7 @@ with col_right:
 
         with tab2:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: var(--ink-subtle); margin-bottom: 8px;">
                 Environmental Degradation Kinetic Verification
             </div>
             """, unsafe_allow_html=True)
@@ -845,11 +908,11 @@ with col_right:
                     "Status": f"PASS (HDT = {top_mat_data.get('heat_deflection_temp', 0)} °C)"
                 }
             ]
-            st.dataframe(pd.DataFrame(degradation_rows), use_container_width=True, hide_index=True)
+            render_table(pd.DataFrame(degradation_rows))
 
         with tab3:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: var(--ink-subtle); margin-bottom: 8px;">
                 Techno-Economic Sourcing & Wilson-Harris EOQ Analytics
             </div>
             """, unsafe_allow_html=True)
@@ -886,11 +949,11 @@ with col_right:
                         "MOQ / EOQ": f"{moq:.0f}kg / {eff_eoq:.0f}kg",
                         "TOPSIS Score": f"{score:.1f}/100"
                     })
-                st.dataframe(pd.DataFrame(econ_rows), use_container_width=True, hide_index=True)
+                render_table(pd.DataFrame(econ_rows))
 
         with tab4:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: var(--ink-subtle); margin-bottom: 8px;">
                 Engine Decision Provenance & Optimization Pipeline
             </div>
             """, unsafe_allow_html=True)
@@ -910,13 +973,13 @@ with col_right:
 
             arb = res.get("arbitration_result")
             if arb and arb.get("arbitrated"):
-                st.markdown("<div style='border-top: 1px solid #d9dde3; margin: 12px 0;'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='border-top: 1px solid var(--hairline); margin: 12px 0;'></div>", unsafe_allow_html=True)
                 st.markdown(f"**Cloud Internet Tie-Breaking Arbitration ({arb.get('engine', 'Cloud AI')})**")
                 st.caption(arb.get("arbitration_notes", ""))
 
         with tab5:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: var(--ink-subtle); margin-bottom: 8px;">
                 Verified ChromaDB Document Retrieval Chunks
             </div>
             """, unsafe_allow_html=True)
@@ -931,7 +994,7 @@ with col_right:
                 st.caption("No vector store chunks retrieved for active query.")
 
         # Export Report Section
-        st.markdown("<div style='border-top: 1px solid #d9dde3; margin: 20px 0 14px 0;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='border-top: 1px solid var(--hairline); margin: 20px 0 14px 0;'></div>", unsafe_allow_html=True)
         report_md = EngineeringReportGenerator.generate_markdown_report(res, spec)
         st.download_button(
             label="Export Technical Specification Report (Markdown)",

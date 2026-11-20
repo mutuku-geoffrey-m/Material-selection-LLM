@@ -927,7 +927,7 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
         "glass_transition_temp": 1336.0,
         "melting_point_c": 1336.0,  # Solidus °C
         "heat_deflection_temp": 950.0,  # °C (sustains mechanical loads up to 700°C)
-        "max_service_temp_c": 1050.0,  # °C (oxidation and thermal radiation barrier limit)
+        "max_service_temp_c": 700.0,  # °C (oxidation and thermal radiation barrier limit)
         "thermal_conductivity": 11.4,  # W/(m·K)
         "specific_heat_capacity": 435.0,  # J/(kg·K)
         "water_absorption_24h": 0.0,

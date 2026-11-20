@@ -17,7 +17,7 @@ from src.ashby_engine import AshbyIndex, INDEX_DESCRIPTIONS
 from src.compatibility import FAMILY_LABELS
 from src.nlp_parser import NLPTranslationLayer
 
-DEFAULT_MODEL = "llama3.2:1b"
+DEFAULT_MODEL = "llama3.2:3b"
 
 COMPONENT_CLASSES: List[str] = [
     "aerospace_airframe_or_drone", "automotive_aerodynamic_wing_or_spoiler", "automotive_impact_component",
@@ -191,7 +191,10 @@ def apply_hints(spec: Dict[str, Any], hints: Dict[str, Any], prompt: str) -> Lis
     flags = {"submerged_water": "submerged_aquatic_exposure", "marine_saltwater": "marine_industrial_exposure",
              "outdoor_uv": "outdoor_uv_exposure", "cryogenic": "is_cryogenic", "chemical_exposure": "chemical_or_saline_exposure",
              "food_contact": "food_contact_safe"}
+    molten = any(w in prompt.lower() for w in ("molten", "melt", "crucible", "furnace", "smelt", "foundry", "slag"))
     for env in hints.get("environment", []):
+        if molten and env in ("submerged_water", "marine_saltwater"):
+            continue
         boundary[flags[env]] = True
     if "marine_saltwater" in hints.get("environment", []):
         boundary["chemical_or_saline_exposure"] = True

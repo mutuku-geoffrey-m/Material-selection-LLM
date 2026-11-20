@@ -285,6 +285,9 @@ class NLPTranslationLayer:
             )
         )
 
+        is_molten_process = any(w in prompt_lower for w in ["molten", "melt", "crucible", "furnace", "smelt", "foundry", "slag", "forge", "kiln"])
+        if is_molten_process:
+            is_submerged = False  # immersion in a melt is a high-temperature process, not a river or marine duty
         # Layman: "sun", "sunlight", "outdoor", "uv", "outside", "kenya", "car", "automotive", "spoiler", "wind turbine"
         is_outdoor_uv = any(w in prompt_lower for w in [
             "sun", "sunlight", "outdoor", "outside", "uv", "equator", "weather", "roof", "roofing", "solar",
@@ -533,13 +536,17 @@ class NLPTranslationLayer:
         is_blade_or_hydro = component_type in ["turbine_blade_or_impeller", "turbomachine_blade", "wind_turbine_blade", "automotive_aerodynamic_wing_or_spoiler", "propulsion_propeller", "cutting_tool_or_blade"] or "blade" in prompt_lower or "propeller" in prompt_lower
         
         if is_blade_or_hydro:
-            if ("exact weight" not in prompt_lower and not target_yield_mpa) or any(w in prompt_lower for w in ["don't know", "unknown weight", "not know"]):
+            if is_submerged and (("exact weight" not in prompt_lower and not target_yield_mpa) or any(w in prompt_lower for w in ["don't know", "unknown weight", "not know"])):
                 detected_ambiguities.append(
                     "Exact hydrodynamic load magnitude is unquantified by user. Estimated via typical Kenyan river flow conditions (velocity u = 2.0 to 3.0 m/s, dynamic pressure q = 2.0 to 4.5 kPa)."
                 )
-            if not target_chord_mm:
+            if is_submerged and not target_chord_mm:
                 detected_ambiguities.append(
                     "Blade geometric chord length unstated. Assumed micro-hydro baseline: c = 180 mm, span L = 450 mm."
+                )
+            if is_molten_process:
+                detected_ambiguities.append(
+                    "Immersion in a molten medium is assumed: the part must retain strength at the stated temperature and resist attack by the melt."
                 )
         elif is_outdoor_uv:
             detected_ambiguities.append(

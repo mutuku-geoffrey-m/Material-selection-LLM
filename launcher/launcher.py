@@ -1,7 +1,7 @@
 """
 EMS-OS one-click launcher (Windows).
 
-First run : installs whatever is missing (Python, Ollama, project dependencies, llama3.2:1b model),
+First run : installs whatever is missing (Python, Ollama, project dependencies, llama3.2:3b model),
             creates a desktop shortcut, then opens the Streamlit workbench.
 Later runs: only checks that everything is still in place, starts Ollama / Streamlit if they are
             not already running, and opens the browser.
@@ -14,7 +14,7 @@ from pathlib import Path
 
 APP_PORT = int(os.getenv("STREAMLIT_SERVER_PORT", "8501"))
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-MODEL = os.getenv("LOCAL_MODEL", "llama3.2:1b")
+MODEL = os.getenv("LOCAL_MODEL", "llama3.2:3b")
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 FROZEN = getattr(sys, "frozen", False)
@@ -183,7 +183,7 @@ def ensure_model(exe):
     if wanted in names:
         say(f"Model {MODEL} is installed.")
     else:
-        say(f"Downloading model {MODEL} (about 1.3 GB, first run only) ...")
+        say(f"Downloading model {MODEL} (about 2 GB, first run only) ...")
         run([exe, "pull", MODEL])
 
 

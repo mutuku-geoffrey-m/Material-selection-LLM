@@ -1,5 +1,5 @@
 """
-Engineering LLM Orchestrator: Local Standalone Base Engine (llama3.2:1b via Ollama)
+Engineering LLM Orchestrator: Local Standalone Base Engine (llama3.2:3b via Ollama)
 with Automatic Cloud AI / Gemini Internet Arbitration for Close Material Contenders,
 Chain-of-Thought Engineering Reasoning, and Techno-Economic Supply Chain Optimization.
 """
@@ -8,7 +8,7 @@ import os
 import re
 from src.text_matching import as_keyword_text
 from src.materials_db import MATERIALS_DATABASE
-from src.compatibility import (FAMILY_LABELS, belongs_to_family, family_member_keys,
+from src.compatibility import (FAMILY_LABELS, service_limit_c, belongs_to_family, family_member_keys,
                                is_high_strength_aluminium_series, marine_service)
 import json
 import time
@@ -45,7 +45,7 @@ class LLMOrchestrator:
         self.local_endpoint = local_endpoint or f"{base_url}/api/generate"
         self.cloud_api_key = cloud_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
         self.cloud_model = cloud_model
-        self.local_model = local_model or os.getenv("LOCAL_MODEL", "llama3.2:1b")
+        self.local_model = local_model or os.getenv("LOCAL_MODEL", "llama3.2:3b")
         # Idle timeouts (seconds) for the local and cloud model calls; configurable through the environment.
         self.local_timeout_s = float(os.getenv("EMS_LLM_TIMEOUT_S", "120"))
         self.cloud_timeout_s = float(os.getenv("EMS_CLOUD_TIMEOUT_S", "20"))
@@ -363,6 +363,11 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
                 advisories.append(f"No {label} grade in the catalogue satisfies the stated service conditions, so the "
                                   f"unrestricted ranking is shown. The {label} family is not recommended for this brief.")
 
+        if ranked_materials and ranked_materials[0].get("thermally_inviable"):
+            advisories.append("No catalogue material has a continuous service limit at or above the stated temperature. The "
+                              "candidates shown exceed their limits and are indicative only; refractory or ceramic grades "
+                              "outside the catalogue should be considered.")
+
         # Chemical-compatibility exclusions (for example liquid gallium against aluminium and copper).
         for excluded_family in boundary.get("excluded_material_families", []):
             kept = [m for m in ranked_materials if not belongs_to_family(m, excluded_family)]
@@ -457,26 +462,49 @@ You MUST recommend {top_mat.get('name')} as the primary winning material in your
         mfg_process_label = engineering_spec.get("boundary_conditions_and_constraints", {}).get("manufacturing_process", "Universal Multi-Process Evaluation")
         temp_c = engineering_spec.get("numerical_parameters", {}).get("target_service_temperature_c")
         
+        boundary_for_prompt = engineering_spec.get("boundary_conditions_and_constraints", {})
         top_mat_name = top_mat.get('name') if top_mat else 'Engineering Material'
         top_mat_family = top_mat.get('family', '') if top_mat else 'General'
         top_mat_yield = top_mat.get('yield_strength', 'N/A') if top_mat else 'N/A'
         top_mat_mod = top_mat.get('youngs_modulus_iso', top_mat.get('youngs_modulus_print_xy', 'N/A')) if top_mat else 'N/A'
         top_mat_density = top_mat.get('density', 'N/A') if top_mat else 'N/A'
 
-        focused_llm_prompt = f"""You are a Senior Materials Science & Metallurgical Specialist.
-Target Component: {user_prompt}
-Governing Component Class: {comp_class}
-Selected Top Material: {top_mat_name} (Family: {top_mat_family})
-Mechanical Ground Truth: Yield Strength = {top_mat_yield} MPa, Modulus = {top_mat_mod} GPa, Density = {top_mat_density} kg/m³
-Primary Ashby Index: {ashby_key} ({engineering_spec.get('synthesized_engineering_spec', {}).get('ashby_mathematical_formula', '')})
-Runner-Up Candidates: {runners_up}
-Operating Boundary Conditions: Submerged={is_submerged}, Temp={temp_c or 'Ambient'}°C, Route={mfg_process_label}
+        top_record = MATERIALS_DATABASE.get(top_mat.get("key"), {}) if top_mat else {}
 
-Provide concise, high-density engineering commentary:
-1. Microstructural & physical justification for selecting {top_mat_name}.
-2. Operational failure risk analysis (corrosion, fatigue, creep, or hydrostatic pressure).
-3. Primary fabrication & quality control directive.
-Keep response strictly under 180 words. Professional engineering terminology only."""
+        def _fact(label: str, value, unit: str) -> str:
+            return f"{label}: {value} {unit}\n" if value not in (None, "", "N/A") else ""
+
+        verified_facts = (
+            _fact("Yield strength", top_record.get("yield_strength"), "MPa")
+            + _fact("Ultimate tensile strength", top_record.get("ultimate_tensile_strength"), "MPa")
+            + _fact("Young's modulus", top_record.get("youngs_modulus_iso") or top_record.get("youngs_modulus_print_xy"), "GPa")
+            + _fact("Density", top_record.get("density"), "kg/m³")
+            + _fact("Melting point", top_record.get("melting_point_c"), "°C")
+            + _fact("Maximum continuous service temperature", round(service_limit_c(top_record)) if top_record else None, "°C")
+            + _fact("Thermal conductivity", top_record.get("thermal_conductivity"), "W/(m·K)")
+        )
+        conditions = [f"service temperature {temp_c:g} °C" if temp_c is not None else "ambient temperature"]
+        if is_submerged:
+            conditions.append("submerged water service")
+        conditions.extend(f"contact with {m}" for m in boundary_for_prompt.get("chemical_media", []))
+
+        route_instruction = ("not restricted; recommend one conventional route suited to this material"
+                             if "universal" in str(mfg_process_label).lower() else str(mfg_process_label))
+        focused_llm_prompt = f"""You are a materials engineer writing short commentary for a design report.
+Design brief: {user_prompt}
+Component class: {comp_class}
+Selected material: {top_mat_name} ({top_mat_family})
+Governing index: {ashby_key}
+Stated conditions: {'; '.join(conditions)}
+Manufacturing route: {route_instruction}
+
+Verified catalogue data (the only numerical properties you may quote):
+{verified_facts}
+Rules:
+- Quote numerical properties only from the verified data above. If a property is not listed, give no number for it.
+- Discuss only the failure modes that the stated conditions make relevant; do not mention conditions that are absent from the brief.
+- Keep fabrication advice consistent with the manufacturing route stated above.
+Write three short paragraphs headed "Material rationale", "Principal failure risks" and "Fabrication and quality control". Use at most 170 words in total."""
 
         expert_report = self._autonomous_expert_synthesis(
             user_prompt=user_prompt,
@@ -485,6 +513,8 @@ Keep response strictly under 180 words. Professional engineering terminology onl
             hydro=hydro_analysis,
             retrieved=retrieved_chunks
         )
+        if advisories:
+            expert_report += "\n\n### 8. Advisories and Compatibility Notes\n" + "\n".join(f"- {a}" for a in advisories)
 
         if self.mode == self.MODE_AUTONOMOUS_EXPERT:
             generation_text = expert_report
@@ -492,7 +522,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
         elif self.mode == self.MODE_CLOUD:
             cloud_output = self._call_cloud_llm(focused_llm_prompt)
             if cloud_output:
-                generation_text = f"{expert_report}\n\n### 4. Advanced Metallurgical & Microstructural Commentary (Cloud AI)\n{cloud_output}"
+                generation_text = f"{expert_report}\n\n### 9. Generated Commentary (Cloud Model; verify before use)\n{cloud_output}"
                 active_engine = f"Cloud API ({self.cloud_model})"
             else:
                 generation_text = expert_report
@@ -500,7 +530,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
         else:
             local_output = self._call_local_llm(focused_llm_prompt)
             if local_output:
-                generation_text = f"{expert_report}\n\n### 4. Advanced Metallurgical & Microstructural Commentary (Local Ollama Engine)\n{local_output}"
+                generation_text = f"{expert_report}\n\n### 9. Generated Commentary (Local Language Model; verify before use)\n{local_output}"
                 active_engine = f"Local Standalone LLM ({self.local_model} via Ollama)"
             else:
                 generation_text = expert_report + (
@@ -509,9 +539,6 @@ Keep response strictly under 180 words. Professional engineering terminology onl
                     "and are not affected.*"
                 )
                 active_engine = "Autonomous Expert Reasoning Engine (Deterministic Verification)"
-
-        if advisories:
-            generation_text += "\n\n### Advisories\n" + "\n".join(f"- {a}" for a in advisories)
 
         # Append Cloud AI Arbitration Section if active
         if arbitration_result and arbitration_result.get("arbitrated"):
@@ -582,7 +609,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
 
         return {
             "mode_used": active_engine,
-            "synthesized_response": generation_text,
+            "synthesized_response": self._renumber_headings(generation_text),
             "ranked_materials": ranked_materials,
             "techno_economic_leaderboard": techno_economic_leaderboard,
             "thinking_process": thinking_log,
@@ -592,6 +619,17 @@ Keep response strictly under 180 words. Professional engineering terminology onl
             "hydrodynamic_analysis": hydro_analysis,
             "retrieved_context_count": len(retrieved_chunks)
         }
+
+    @staticmethod
+    def _renumber_headings(text: str) -> str:
+        """Number the report sections consecutively (1, 2, 3, ...) in order of appearance."""
+        counter = [0]
+
+        def _next(match):
+            counter[0] += 1
+            return f"### {counter[0]}. "
+
+        return re.sub(r"(?m)^### \d+\. ", _next, text)
 
     def _call_local_llm(self, prompt: str) -> Optional[str]:
         """Call local llama.cpp / Ollama server with low-latency constraints."""

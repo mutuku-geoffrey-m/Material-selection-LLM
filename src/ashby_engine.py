@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional, Tuple
 import math
 from src.materials_db import MATERIALS_DATABASE, list_all_materials
 from src.text_matching import as_keyword_text
+from src.compatibility import service_limit_c
 
 
 class AshbyIndex:
@@ -453,7 +454,7 @@ def rank_materials(
         thermal_penalty = 1.0
         thermally_inviable = False
         if max_service_temp_c is not None:
-            t_max_limit = mat.get("max_service_temp_c") or mat.get("heat_deflection_temp") or 350.0
+            t_max_limit = service_limit_c(mat)
             is_polymer = any(w in mat.get("family", "") for w in ["Thermoplastic", "Polymer", "Elastomer", "Composite"])
             if (max_service_temp_c > t_max_limit) or (is_polymer and max_service_temp_c > (mat.get("heat_deflection_temp") or 50.0)):
                 thermal_penalty = 1e-12
@@ -478,7 +479,7 @@ def rank_materials(
                 elif mat_key == "Stainless_Steel_316L" and max_service_temp_c > 650.0:
                     thermal_penalty = 1e-12
                     thermally_inviable = True
-                elif mat_key == "Inconel_718" and max_service_temp_c > 1050.0:
+                elif mat_key == "Inconel_718" and max_service_temp_c > 700.0:
                     thermal_penalty = 1e-12
                     thermally_inviable = True
                 elif mat_key == "Copper_C11000" and max_service_temp_c > 400.0 and not any(w in prompt_lower for w in ["cooling jacket", "regenerative", "heat spreader", "teg"]):
