@@ -1,11 +1,15 @@
 """
-Engineering LLM Orchestrator: Local Standalone Base Engine (llama3.2 via Ollama)
+Engineering LLM Orchestrator: Local Standalone Base Engine (llama3.2:1b via Ollama)
 with Automatic Cloud AI / Gemini Internet Arbitration for Close Material Contenders,
 Chain-of-Thought Engineering Reasoning, and Techno-Economic Supply Chain Optimization.
 """
 
 import os
 import re
+from src.text_matching import as_keyword_text
+from src.materials_db import MATERIALS_DATABASE
+from src.compatibility import (FAMILY_LABELS, belongs_to_family, family_member_keys,
+                               is_high_strength_aluminium_series, marine_service)
 import json
 import time
 import urllib.request
@@ -41,9 +45,8 @@ class LLMOrchestrator:
         self.local_endpoint = local_endpoint or f"{base_url}/api/generate"
         self.cloud_api_key = cloud_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
         self.cloud_model = cloud_model
-        self.local_model = local_model or os.getenv("LOCAL_MODEL", "llama3.2")
-        # Timeouts are configurable. A CPU-only llama3.2 needs far longer than 3 s to load and write ~250 tokens,
-        # so the old 3 s breaker made the LLM commentary fail on essentially every prompt.
+        self.local_model = local_model or os.getenv("LOCAL_MODEL", "llama3.2:1b")
+        # Idle timeouts (seconds) for the local and cloud model calls; configurable through the environment.
         self.local_timeout_s = float(os.getenv("EMS_LLM_TIMEOUT_S", "120"))
         self.cloud_timeout_s = float(os.getenv("EMS_CLOUD_TIMEOUT_S", "20"))
         self.last_llm_error: Optional[str] = None
@@ -128,7 +131,7 @@ class LLMOrchestrator:
         boundary = engineering_spec.get("boundary_conditions_and_constraints", {})
 
         arbitration_prompt = f"""You are a Senior Metallurgical and Materials Selection Consultant.
-The deterministic Ashby optimization engine has evaluated a database of 1,490+ materials for this engineering specification:
+The deterministic Ashby optimization engine has evaluated a database of more than 1,500 materials for this engineering specification:
 User Specification: "{user_prompt}"
 Component Class: {synth_spec.get('component_classification', 'Mechanical Component')}
 Primary Governing Ashby Index: {synth_spec.get('primary_governing_ashby_index', 'N/A')} ({synth_spec.get('ashby_mathematical_formula', '')})
@@ -248,7 +251,7 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
         """
         Execute material selection workflow:
         1. Parse boundary conditions and physical constraints.
-        2. Filter and rank materials mathematically across the 1,490+ database using Ashby indices.
+        2. Filter and rank materials mathematically across the 1,500-material database using Ashby indices.
         3. Detect close contenders and automatically invoke Cloud AI (Gemini) arbitration over the internet.
         4. Calculate techno-economic metrics (EOQ, MOQ, Lead Times, Reproducibility).
         5. Synthesize the final report using the local Ollama LLM base engine with verified provenance.
@@ -272,7 +275,7 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
                        f"Boundary conditions: Submerged={is_submerged}, UV Exposure={is_outdoor_uv}, Max Temp={temp_c or 'Ambient'}°C."
         })
 
-        # Phase 2: High-Throughput Screening across 1,490+ database
+        # Phase 2: High-Throughput Screening across 1,500-material database
         is_cnc = ("conventional subtractive" in mfg_process.lower() or 
                   ("cnc" in mfg_process.lower() or "machining" in mfg_process.lower())) and "universal" not in mfg_process.lower()
         fdm_preference = boundary.get("fdm_only_preference", False)
@@ -280,20 +283,20 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
 
         thinking_log.append({
             "phase": "Phase 2: Database Screening & Boundary Constraint Elimination",
-            "details": f"Screening 1,490+ standard engineering materials (ANSI, ISO, DIN, JIS, polymers, composites, ceramics). "
+            "details": f"Screening more than 1,500 standard engineering materials (ANSI, ISO, DIN, JIS, polymers, composites, ceramics). "
                        f"Manufacturing Route: '{mfg_process}' (FDM-Only: {fdm_only}, CNC-Only: {is_cnc}). "
                        f"Applying environmental penalty filters (hydrolysis, UV embrittlement, service temperature)."
         })
 
         # Determine continuous composite autoclave feasibility
         comp_class = engineering_spec.get("synthesized_engineering_spec", {}).get("component_classification", "")
-        is_consumer_infeasible = any(w in user_prompt.lower() for w in [
+        is_consumer_infeasible = any(w in as_keyword_text(user_prompt) for w in [
             "toy", "kid", "cheap", "test a model", "roof", "roofing", "pipe", "plumbing", "bottle", "utensil",
             "pan", "pot", "cookware", "phone case", "shoe", "chair", "table", "desk"
         ]) or boundary.get("rapid_prototyping_priority", False)
         allow_composites = not is_consumer_infeasible and (
             comp_class in ["aerospace_airframe_or_drone", "structural_frame_or_chassis", "automotive_aerodynamic_wing_or_spoiler", "wind_turbine_blade"] or
-            any(w in user_prompt.lower() for w in [
+            any(w in as_keyword_text(user_prompt) for w in [
                 "cfrp", "carbon fiber", "prepreg", "composite", "aerospace", "airplane", "aircraft",
                 "drone", "wing", "fuselage", "satellite", "race", "racing", "bike", "bicycle", "chassis",
                 "springboard", "diving board", "pole vault", "vaulting pole", "speaker", "tether",
@@ -301,7 +304,7 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
             ])
         )
 
-        ranked_materials = rank_materials(
+        rank_kwargs = dict(
             index_key=ashby_key,
             fdm_only=fdm_only,
             cnc_only=is_cnc,
@@ -338,6 +341,33 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
             non_magnetic_required=boundary.get("non_magnetic_required", False),
             prompt_text=user_prompt
         )
+        ranked_materials = rank_materials(**rank_kwargs)
+
+        # Candidate restriction requested in the brief (for example "which aluminium alloy ...").
+        advisories: List[str] = list(engineering_spec.get("advisories") or [])
+        requested_family = boundary.get("requested_material_family")
+        if requested_family:
+            label = FAMILY_LABELS.get(requested_family, requested_family)
+            restricted = rank_materials(**{**rank_kwargs, "candidate_filter": [],
+                                           "materials": [MATERIALS_DATABASE[k] for k in family_member_keys(requested_family)]})
+            if requested_family == "aluminium" and marine_service(user_prompt):
+                marine_ready = [m for m in restricted if not is_high_strength_aluminium_series(m)]
+                if marine_ready:
+                    restricted = marine_ready
+                    advisories.append("The 2xxx and 7xxx aluminium series were excluded because they are susceptible to "
+                                      "exfoliation and stress-corrosion cracking in marine service.")
+            if restricted and not restricted[0].get("thermally_inviable"):
+                ranked_materials = restricted
+                advisories.append(f"Candidates were restricted to {label} grades as requested in the brief.")
+            else:
+                advisories.append(f"No {label} grade in the catalogue satisfies the stated service conditions, so the "
+                                  f"unrestricted ranking is shown. The {label} family is not recommended for this brief.")
+
+        # Chemical-compatibility exclusions (for example liquid gallium against aluminium and copper).
+        for excluded_family in boundary.get("excluded_material_families", []):
+            kept = [m for m in ranked_materials if not belongs_to_family(m, excluded_family)]
+            if kept:
+                ranked_materials = kept
 
         top_candidates = ranked_materials[:5]
         thinking_log.append({
@@ -396,7 +426,7 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
             "turbine_blade_or_impeller", "turbomachine_blade", "wind_turbine_blade",
             "automotive_aerodynamic_wing_or_spoiler", "propulsion_propeller",
             "hydro_turbine_runner", "hydrofoil_strut"
-        ] or any(w in user_prompt.lower() for w in ["blade", "runner", "impeller", "turbine", "hydrofoil", "push water"])
+        ] or any(w in as_keyword_text(user_prompt) for w in ["blade", "runner", "impeller", "turbine", "hydrofoil", "push water"])
         if is_submerged and is_aero_blade:
             flow_v = engineering_spec.get("numerical_parameters", {}).get("estimated_flow_velocity_ms", 2.4)
             chord_m = engineering_spec.get("numerical_parameters", {}).get("estimated_chord_m", 0.18)
@@ -479,6 +509,9 @@ Keep response strictly under 180 words. Professional engineering terminology onl
                     "and are not affected.*"
                 )
                 active_engine = "Autonomous Expert Reasoning Engine (Deterministic Verification)"
+
+        if advisories:
+            generation_text += "\n\n### Advisories\n" + "\n".join(f"- {a}" for a in advisories)
 
         # Append Cloud AI Arbitration Section if active
         if arbitration_result and arbitration_result.get("arbitrated"):
@@ -601,7 +634,10 @@ Keep response strictly under 180 words. Professional engineering terminology onl
             text = "".join(parts).strip()
             return text or None
         except Exception as e:
-            self.last_llm_error = f"{type(e).__name__}: {str(e)[:80]}"
+            if getattr(e, "code", None) == 404:
+                self.last_llm_error = f"model '{self.local_model}' is not installed in Ollama (run: ollama pull {self.local_model})"
+            else:
+                self.last_llm_error = f"{type(e).__name__}: {str(e)[:80]}"
             return None
 
     def _call_cloud_llm(self, prompt: str) -> Optional[str]:
@@ -682,7 +718,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
             mat_obj = get_material(m["key"])
             fdm_info = mat_obj["fdm_printability"]
             mfg_note = (
-                f"{'Requires hardened steel/ruby nozzle' if fdm_info.get('abrasive_nozzle_required') else 'Standard brass nozzle'}; Bed {fdm_info.get('bed_temperature_min')}-{fdm_info.get('bed_temperature_max')}Â°C"
+                f"{'Requires hardened steel/ruby nozzle' if fdm_info.get('abrasive_nozzle_required') else 'Standard brass nozzle'}; Bed {fdm_info.get('bed_temperature_min')}-{fdm_info.get('bed_temperature_max')}°C"
                 if fdm_info.get("ease_of_printing") != "Not FDM Printable"
                 else "CNC Machining / Foundry Casting"
             )
@@ -715,11 +751,11 @@ Keep response strictly under 180 words. Professional engineering terminology onl
         # Thermal discussion if high temperature
         if temp_c is not None and temp_c > 140.0:
             response_lines.append(
-                f"- **Thermal Service Threshold Warning ({temp_c}Â°C):** All standard thermoplastics (PLA, PETG, ABS, ASA, Nylon PA12) suffer irreversible thermal deformation at this temperature, as their heat deflection temperatures (HDT: 52Â°C to 140Â°C) are exceeded. Consequently, the system selects **{top_mat['name']}**, which provides continuous thermal stability up to its operating threshold."
+                f"- **Thermal Service Threshold Warning ({temp_c}°C):** All standard thermoplastics (PLA, PETG, ABS, ASA, Nylon PA12) suffer irreversible thermal deformation at this temperature, as their heat deflection temperatures (HDT: 52°C to 140°C) are exceeded. Consequently, the system selects **{top_mat['name']}**, which provides continuous thermal stability up to its operating threshold."
             )
 
         # Domain-Specific Engineering Analysis (Evaluated by Specific Functional Class First)
-        if "optical" in comp_class or "transparent" in comp_class or "glass" in user_prompt.lower() or "clear" in user_prompt.lower():
+        if "optical" in comp_class or "transparent" in comp_class or "glass" in as_keyword_text(user_prompt) or "clear" in as_keyword_text(user_prompt):
             response_lines.extend([
                 f"- **Optical Clarity & Impact Resistance:** Transparent viewports, shields, and optical components require high luminous transmittance (>88%) combined with high fracture resistance against impact and pressure.",
                 f"- **Selection Rationale:** **{top_mat['name']}** provides water-clear optical transparency with 250x the impact resistance of float glass ({top_mat_data['impact_strength_izod']} kJ/m²), completely eliminating catastrophic shatter hazards.",
@@ -737,70 +773,70 @@ Keep response strictly under 180 words. Professional engineering terminology onl
                 "- **Selection of PETG Matrix:** PETG provides hydrophobic chemical resilience and near-zero hydrolytic chain scission in river water, retaining >96.5% of its strength.",
                 f"- **Carbon Fiber Reinforcement ({top_mat['name']}):** Neat PETG exhibits lower modulus (2.1 GPa), which leads to excessive hydrodynamic tip deflection. Carbon fiber reinforcement increases the modulus to **{top_mat_data['youngs_modulus_print_xy']} GPa** (a 2.8x increase), controls blade creep under continuous torque, and dramatically improves high-cycle fatigue threshold to {top_mat_data['fatigue_strength_limit']} MPa."
             ])
-        elif "frame" in comp_class or "chassis" in comp_class or "bike" in user_prompt.lower() or "bicycle" in user_prompt.lower():
+        elif "frame" in comp_class or "chassis" in comp_class or "bike" in as_keyword_text(user_prompt) or "bicycle" in as_keyword_text(user_prompt):
             response_lines.extend([
                 f"- **Structural Frame Optimization:** Bicycle and chassis tubes act as thin-walled beams subjected to multi-axial bending, torsion, and pedaling fatigue. Governed by specific bending stiffness $M = E^{{1/2}}/\\rho$ and fatigue endurance.",
                 f"- **Candidate Comparison:** **{top_mat['name']}** achieves an optimal balance with Young's modulus $E = {top_mat_data['youngs_modulus_print_xy']}\\ \\text{{GPa}}$ and density $\\rho = {top_mat_data['density']/1000.0:.2f}\\ \\text{{g/cm}}^3$. Continuous CFRP Prepreg offers the ultimate stiffness-to-weight ratio for competitive racing, Titanium Ti-6Al-4V delivers legendary road vibration damping and infinite fatigue life without corrosion, while Aluminium 6061-T6 provides an exceptional cost-to-rigidity ratio."
             ])
-        elif "implant" in comp_class or "biomedical" in comp_class or "hip" in user_prompt.lower() or "knee" in user_prompt.lower():
+        elif "implant" in comp_class or "biomedical" in comp_class or "hip" in as_keyword_text(user_prompt) or "knee" in as_keyword_text(user_prompt):
             response_lines.extend([
                 f"- **Biomedical & Biocompatibility Engineering:** Implants require ISO 10993 compliance, complete biological inertness, and resistance to chloride ion attack in physiological fluids.",
                 f"- **Biomechanics (Stress Shielding Prevention):** Titanium Ti-6Al-4V and medical-grade PEEK provide superior osseointegration and high fatigue life under million-cycle gait loading.",
                 f"- **Selection Rationale:** **{top_mat['name']}** provides non-cytotoxic, corrosion-immune performance with mechanical durability matching anatomical structural loads."
             ])
-        elif "case" in comp_class or "bumper" in comp_class or "phone" in user_prompt.lower():
+        elif "case" in comp_class or "bumper" in comp_class or "phone" in as_keyword_text(user_prompt):
             response_lines.extend([
                 f"- **Impact Energy Absorption Physics:** Drop survivability and shock mitigation are governed by maximum elastic strain energy capacity ($M = \\sigma_y^2 / E$) and elongation before fracture.",
-                f"- **Selection Rationale:** **{top_mat['name']}** provides massive elongation at break ({top_mat_data['elongation_at_break']}%) and immense Izod impact toughness ({top_mat_data['impact_strength_izod']} kJ/mÂ²), dissipating kinetic drop energy through reversible elastic damping without brittle cracking."
+                f"- **Selection Rationale:** **{top_mat['name']}** provides massive elongation at break ({top_mat_data['elongation_at_break']}%) and immense Izod impact toughness ({top_mat_data['impact_strength_izod']} kJ/m²), dissipating kinetic drop energy through reversible elastic damping without brittle cracking."
             ])
-        elif "cushion" in comp_class or "footwear" in comp_class or "rubber" in user_prompt.lower() or "sole" in user_prompt.lower() or "elastomer" in comp_class:
+        elif "cushion" in comp_class or "footwear" in comp_class or "rubber" in as_keyword_text(user_prompt) or "sole" in as_keyword_text(user_prompt) or "elastomer" in comp_class:
             response_lines.extend([
                 f"- **Elastomeric Compliance & Shock Absorption Physics:** Footwear soles, flexible gaskets, and rubbery components require massive reversible elastic elongation without permanent yield set.",
-                f"- **Selection Rationale:** **{top_mat['name']}** offers 500% elongation at break, supreme Izod impact energy absorption ({top_mat_data['impact_strength_izod']} kJ/mÂ²), and indestructible inter-layer fusion, perfectly simulating vulcanized rubber while remaining 3D-printable or injection-moldable."
+                f"- **Selection Rationale:** **{top_mat['name']}** offers 500% elongation at break, supreme Izod impact energy absorption ({top_mat_data['impact_strength_izod']} kJ/m²), and indestructible inter-layer fusion, perfectly simulating vulcanized rubber while remaining 3D-printable or injection-moldable."
             ])
-        elif "spoiler" in comp_class or "wing" in comp_class or "spoiler" in user_prompt.lower() or "splitter" in user_prompt.lower():
+        elif "spoiler" in comp_class or "wing" in comp_class or "spoiler" in as_keyword_text(user_prompt) or "splitter" in as_keyword_text(user_prompt):
             response_lines.extend([
                 f"- **Aerodynamic Downforce & Vehicle Dynamics Physics:** Automotive rear wings and spoilers generate stabilizing aerodynamic downforce ($L = \\frac{1}{2} C_L \\rho_{{\\text{{air}}}} v^2 A$) to increase tire grip at speed. Governed by flexural stiffness per unit mass ($M = E^{{1/3}}/\\rho$ or $E^{{1/2}}/\\rho$) to resist buffeting and flutter.",
                 f"- **Rejection of Dense Heavy Metals:** Dense metals such as Titanium Ti-6Al-4V (density $\\rho = 4.43\\ \\text{{g/cm}}^3$, $\\$110/\\text{{kg}}$) and alloy steels ($\\rho = 7.85\\ \\text{{g/cm}}^3$) are commercially absurd and dynamically counterproductive. Adding excessive weight to the extreme rear overhang severely degrades the vehicle's polar moment of inertia ($I_z = \\sum m_i r_i^2$), causes boot lid hinge fatigue, and slows cornering turn-in response.",
-                f"- **Selection Rationale:** **{top_mat['name']}** delivers high flexural modulus ({top_mat_data['youngs_modulus_print_xy']} GPa) at exceptionally low density ({top_mat_data['density']/1000.0:.2f} g/cmÂ³), providing rigid downforce transfer without polar inertia penalty. Furthermore, its UV resistance protects against photolytic degradation under outdoor solar exposure."
+                f"- **Selection Rationale:** **{top_mat['name']}** delivers high flexural modulus ({top_mat_data['youngs_modulus_print_xy']} GPa) at exceptionally low density ({top_mat_data['density']/1000.0:.2f} g/cm³), providing rigid downforce transfer without polar inertia penalty. Furthermore, its UV resistance protects against photolytic degradation under outdoor solar exposure."
             ])
-        elif "wind_turbine" in comp_class or ("wind" in user_prompt.lower() and "turbine" in user_prompt.lower()):
+        elif "wind_turbine" in comp_class or ("wind" in as_keyword_text(user_prompt) and "turbine" in as_keyword_text(user_prompt)):
             response_lines.extend([
                 f"- **Wind Turbine Aerofoil Aerodynamics & Flapwise Deflection:** Wind turbine blades act as rotating cantilever aerodynamic beams. Under extreme wind gusts, the spar must resist excessive flapwise tip deflection ($M = E^{{1/2}}/\\rho$) to prevent catastrophic tower strike.",
                 f"- **Cyclic Fatigue Resistance:** Turbines accumulate over $10^8$ alternating cyclic aerodynamic load reversals over their design life, requiring superior fatigue efficiency ($M = \\sigma_{{\\text{{fatigue}}}}/\\rho$).",
                 f"- **Rejection of PLA & Monolithic Metals:** Virgin PLA suffers irreversible creep and hydrolyzes in outdoor precipitation, while heavy metals increase blade rotational inertia ($J = \\int r^2 dm$), drastically increasing cut-in wind speed. **{top_mat['name']}** provides the optimal combination of high specific modulus, fatigue endurance limit ({top_mat_data['fatigue_strength_limit']} MPa), and all-weather outdoor resilience."
             ])
-        elif "knife" in user_prompt.lower() or "scalpel" in user_prompt.lower() or "machete" in user_prompt.lower() or "cutting" in comp_class or ("blade" in user_prompt.lower() and not is_submerged and any(w in user_prompt.lower() for w in ["cut", "chop", "slice", "knife", "razor", "shear", "butcher", "saw"])):
+        elif "knife" in as_keyword_text(user_prompt) or "scalpel" in as_keyword_text(user_prompt) or "machete" in as_keyword_text(user_prompt) or "cutting" in comp_class or ("blade" in as_keyword_text(user_prompt) and not is_submerged and any(w in as_keyword_text(user_prompt) for w in ["cut", "chop", "slice", "knife", "razor", "shear", "butcher", "saw"])):
             response_lines.extend([
                 f"- **Cutting Tool Hardness & Edge Retention:** Industrial knives and cutting blades demand high Rockwell hardness, wear resistance, and high yield strength ($\\sigma_y$) to maintain a keen edge without chipping or plastic rolling.",
                 f"- **Selection Rationale:** **{top_mat['name']}** (quenched and tempered) provides high yield strength ({top_mat_data['yield_strength']} MPa) and exceptional impact toughness, preventing brittle edge fracture under heavy chopping or slicing loads."
             ])
-        elif "culinary" in comp_class or "pan" in user_prompt.lower() or "pot" in user_prompt.lower() or "cookware" in user_prompt.lower():
+        elif "culinary" in comp_class or re.search(r"\b(?:pan|pans|pot|pots|cookware|skillet|wok)\b", as_keyword_text(user_prompt)):
             response_lines.extend([
                 f"- **Culinary Thermal Transfer Physics:** Cooking pans require maximum solid thermal conductivity ($\\lambda$) for instantaneous, uniform heat spreading across the cooking base, eliminating scorched hotspots.",
-                f"- **Selection Rationale:** **{top_mat['name']}** provides elite thermal conductivity ($\\lambda = {top_mat_data['thermal_conductivity']}\\ \\text{{W/(mÂ·K)}}$), enabling rapid pan responsiveness, high thermal capacity, and excellent food-grade durability."
+                f"- **Selection Rationale:** **{top_mat['name']}** provides elite thermal conductivity ($\\lambda = {top_mat_data['thermal_conductivity']}\\ \\text{{W/(m·K)}}$), enabling rapid pan responsiveness, high thermal capacity, and excellent food-grade durability."
             ])
-        elif "toy" in comp_class or "prototyping" in comp_class or "cheap" in user_prompt.lower() or "kid" in user_prompt.lower():
+        elif "toy" in comp_class or "prototyping" in comp_class or "cheap" in as_keyword_text(user_prompt) or "kid" in as_keyword_text(user_prompt):
             response_lines.extend([
                 f"- **Prototyping & Consumer Safety:** Desktop prototypes and toys require non-toxic, safe materials with minimal thermal contraction warpage, crisp geometric resolution, and low unit cost.",
                 f"- **Selection Rationale:** **{top_mat['name']}** is a standard choice for rapid prototyping and toys ($20-$25/kg), printing with low odor, minimal warpage, and tensile yield strength ({top_mat_data['yield_strength']} MPa) suitable for handling."
             ])
-        elif "optical" in comp_class or "transparent" in comp_class or "glass" in user_prompt.lower() or "clear" in user_prompt.lower():
+        elif "optical" in comp_class or "transparent" in comp_class or "glass" in as_keyword_text(user_prompt) or "clear" in as_keyword_text(user_prompt):
             response_lines.extend([
                 f"- **Optical Clarity & Impact Resistance:** Transparent visors and protective glasses require high luminous transmittance (>88%) combined with high fracture resistance against ballistic projectile impact.",
-                f"- **Selection Rationale:** **{top_mat['name']}** provides water-clear optical transparency with 250x the impact resistance of float glass ({top_mat_data['impact_strength_izod']} kJ/mÂ²), completely eliminating catastrophic shatter hazards."
+                f"- **Selection Rationale:** **{top_mat['name']}** provides water-clear optical transparency with 250x the impact resistance of float glass ({top_mat_data['impact_strength_izod']} kJ/m²), completely eliminating catastrophic shatter hazards."
             ])
-        elif "bottle" in user_prompt.lower() or "vessel" in comp_class:
+        elif "bottle" in as_keyword_text(user_prompt) or "vessel" in comp_class:
             response_lines.extend([
                 f"- **Fluid Containment & Food-Grade Hygiene:** Pressure vessels and water bottles require certified food safety, zero plasticizer leaching, and high hoop burst resistance ($M = \\sigma_y^{{1/2}} / \\rho$).",
                 f"- **Selection Rationale:** **{top_mat['name']}** combines certified food-grade purity, chemical resistance, and high impact toughness to prevent cracking upon drops."
             ])
-        elif "pipe" in user_prompt.lower() or "plumbing" in comp_class:
+        elif "pipe" in as_keyword_text(user_prompt) or "plumbing" in comp_class:
             response_lines.extend([
                 f"- **Hydrostatic Conduit Reliability:** Plumbing and fluid pipes operate under continuous water pressure, cyclic water hammer shocks, and chemical contact with municipal additives.",
                 f"- **Selection Rationale:** **{top_mat['name']}** delivers outstanding chemical resistance, hydrolytic stability, and ductility to resist pressure surges without catastrophic bursting."
             ])
-        elif "furniture" in comp_class or "chair" in user_prompt.lower():
+        elif "furniture" in comp_class or "chair" in as_keyword_text(user_prompt):
             response_lines.extend([
                 f"- **Structural Furniture & Ergonomic Mechanics:** Chairs and load-bearing furniture function as cantilever beams resisting human static payload and dynamic shock seating loads.",
                 f"- **Selection Rationale:** **{top_mat['name']}** provides optimal specific bending strength and high fatigue endurance limit ({top_mat_data['fatigue_strength_limit']} MPa), ensuring long-term structural integrity without creeping."
@@ -808,7 +844,7 @@ Keep response strictly under 180 words. Professional engineering terminology onl
         elif "crane" in comp_class or "hook" in comp_class:
             response_lines.extend([
                 f"- **Heavy-Duty Lifting Mechanics:** Hoisting equipment requires high yield strength ($\\sigma_y \\ge 600\\ \\text{{MPa}}$), high fracture toughness ($K_{{IC}}$), and superior resistance to cyclic fatigue propagation under shock loads.",
-                f"- **Selection Rationale:** **{top_mat['name']}** (quenched & tempered) provides outstanding core toughness ({top_mat_data['impact_strength_izod']} kJ/mÂ²) and high fatigue endurance limit ({top_mat_data['fatigue_strength_limit']} MPa), preventing catastrophic brittle shear."
+                f"- **Selection Rationale:** **{top_mat['name']}** (quenched & tempered) provides outstanding core toughness ({top_mat_data['impact_strength_izod']} kJ/m²) and high fatigue endurance limit ({top_mat_data['fatigue_strength_limit']} MPa), preventing catastrophic brittle shear."
             ])
         elif "gear" in comp_class or "bushing" in comp_class:
             response_lines.extend([
@@ -836,7 +872,8 @@ Keep response strictly under 180 words. Professional engineering terminology onl
         # Manufacturing Directives Section
         response_lines.append("")
         family = top_mat_data.get("family", "")
-        if "Metal" in family or "Alloy" in family or "Steel" in family or "Titanium" in family:
+        family_lc = family.lower()
+        if any(w in family_lc for w in ("metal", "alloy", "steel", "titanium", "iron", "copper", "brass", "nickel")):
             response_lines.extend([
                 "### 4. Metallurgical & Subtractive (CNC) Manufacturing Directives",
                 f"- **Machining Parameters:** CNC 3-axis to 5-axis milling from solid billet stock using high-grade carbide endmills with flood coolant.",
@@ -848,14 +885,14 @@ Keep response strictly under 180 words. Professional engineering terminology onl
             response_lines.extend([
                 "### 4. Advanced Composite Manufacturing Directives",
                 "- **Fabrication Method:** Vacuum-bag compression molding or autoclave curing from unidirectional/twill prepreg plies.",
-                "- **Cure Cycle:** Ramp temperature at 2Â°C/min to 120Â°C-180Â°C under 6 bar autoclave pressure with 2-hour dwell for void consolidation.",
-                "- **Ply Orientation:** Balanced quasi-isotropic laminate schedule [0Â°/Â±45Â°/90Â°]s to resist complex multi-axial bending and torsional shear loads.",
+                "- **Cure Cycle:** Ramp temperature at 2°C/min to 120°C-180°C under 6 bar autoclave pressure with 2-hour dwell for void consolidation.",
+                "- **Ply Orientation:** Balanced quasi-isotropic laminate schedule [0°/±45°/90°]s to resist complex multi-axial bending and torsional shear loads.",
                 "- **Trimming & Finishing:** Diamond-coated PCD router tooling with water jet cutting to prevent edge delamination."
             ])
         elif "Ceramic" in family:
             response_lines.extend([
                 "### 4. Technical Ceramic Fabrication Directives",
-                "- **Processing Route:** Cold isostatic pressing (CIP) followed by green-state pre-machining and high-temperature furnace sintering at 1600Â°C.",
+                "- **Processing Route:** Cold isostatic pressing (CIP) followed by green-state pre-machining and high-temperature furnace sintering at 1600°C.",
                 "- **Finishing:** Diamond grinding and ultrasonic abrasive polishing to achieve defect-free surface finish ($R_a < 0.2\\ \\mu\\text{{m}}$)."
             ])
         elif is_subtractive or not is_fdm_process:

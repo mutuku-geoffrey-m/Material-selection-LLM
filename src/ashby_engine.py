@@ -8,6 +8,7 @@ mass minimization, thermal dissipation, and economic constraints.
 from typing import Dict, Any, List, Optional, Tuple
 import math
 from src.materials_db import MATERIALS_DATABASE, list_all_materials
+from src.text_matching import as_keyword_text
 
 
 class AshbyIndex:
@@ -286,7 +287,7 @@ def rank_materials(
     15. Food contact, rapid prototyping, and cutting edge engineering factors
     16. Economic weighting (cost per kg)
     """
-    prompt_lower = (prompt_text or "").lower()
+    prompt_lower = as_keyword_text(prompt_text)
     if materials is None:
         materials = list_all_materials()
 
@@ -1170,22 +1171,17 @@ def create_interactive_ashby_chart(
     x_meta = prop_meta.get(x_prop, {"label": x_prop, "log": True, "unit": ""})
     y_meta = prop_meta.get(y_prop, {"label": y_prop, "log": True, "unit": ""})
 
-    # Muted technical color palette for material families (Linear/Cursor CAD styling)
+    # Muted qualitative palette for material families
     family_colors = {
-        "Thermoplastic Polymer": "#60a5fa",
-        "Thermoplastic Copolymer": "#38bdf8",
-        "Thermoplastic Terpolymer": "#818cf8",
-        "Thermoplastic Polyamide": "#a78bfa",
-        "High-Performance Thermoplastic": "#f472b6",
-        "Short Fiber Reinforced Polymer Composite": "#fb923c",
-        "Continuous Fiber Composite": "#f97316",
-        "Titanium Alloy": "#34d399",
-        "Non-Ferrous Metal Alloy": "#2dd4bf",
-        "High-Strength Alloy Steel": "#f87171",
-        "Ferrous Metal Alloy": "#e11d48",
-        "Technical Ceramic": "#a3e635",
-        "Elastomeric Polymer": "#c084fc",
-        "Engineering Thermoplastic": "#38bdf8"
+        "Carbon Steel": "#4f5d6b", "Alloy Steel": "#5f6f82", "High-Strength Alloy Steel": "#5f6f82", "Tool Steel": "#46525e",
+        "Stainless Steel": "#7b8794", "Ferrous Metal Alloy": "#59656f", "Cast Iron & Ductile Iron": "#6b6f75",
+        "Aluminum Alloy": "#6f9bb3", "Magnesium Alloy": "#8da07a", "Copper & Brass Alloys": "#b07a52",
+        "Titanium Alloy": "#5f8f8b", "Nickel Superalloy": "#7a6f96", "Non-Ferrous Metal Alloy": "#7f93a8",
+        "Specialty Structural Metal": "#8a8f98", "Technical Ceramic": "#b3a46c",
+        "Thermoplastic Polymer": "#a58b6f", "Thermoplastic Copolymer": "#a99479", "Thermoplastic Terpolymer": "#ad9a80",
+        "Thermoplastic Polyamide": "#9f8a73", "High-Performance Thermoplastic": "#946f5a", "Engineering Thermoplastic": "#a58b6f",
+        "Short Fiber Reinforced Polymer Composite": "#9a6b62", "Continuous Fiber Composite": "#8c5e58",
+        "Elastomeric Polymer": "#9a7d9a",
     }
 
     fig = go.Figure()
@@ -1237,10 +1233,10 @@ def create_interactive_ashby_chart(
                 y_vals.append(y_val)
                 marker_sizes.append(7)
                 border_widths.append(1)
-                border_colors.append("#18191b")
+                border_colors.append("#ffffff")
                 hover_texts.append(hover_text)
 
-        color = family_colors.get(fam, "#71717a")
+        color = family_colors.get(fam, "#8a8f98")
         if x_vals:
             fig.add_trace(go.Scatter(
                 x=x_vals,
@@ -1266,12 +1262,12 @@ def create_interactive_ashby_chart(
             name="★ Selected Candidate",
             text=[p["name"] for p in highlighted_points],
             textposition="top right",
-            textfont=dict(size=11, color="#ffffff", family="Inter, sans-serif"),
+            textfont=dict(size=11, color="#1c2733", family="Segoe UI, Arial, sans-serif"),
             hoverinfo="text",
             hovertext=[p["hover"] for p in highlighted_points],
             marker=dict(
                 size=14,
-                color="#f59e0b",
+                color="#1f3a5f",
                 symbol="diamond",
                 line=dict(width=2, color="#ffffff")
             )
@@ -1322,11 +1318,11 @@ def create_interactive_ashby_chart(
             y=ref_y,
             mode="lines",
             name=f"{line_label} [{anchor['name']}]",
-            line=dict(color="#ef4444", width=1.5, dash="dash"),
+            line=dict(color="#9b2c2c", width=1.5, dash="dash"),
             hoverinfo="name"
         ))
 
-    # Layout styling with Linear / ClickHouse CAD workbench aesthetics
+    # Chart layout
     chart_title = f"{y_meta['label']} vs {x_meta['label']}"
     if title_suffix:
         chart_title += f" // {title_suffix}"
@@ -1334,43 +1330,43 @@ def create_interactive_ashby_chart(
     fig.update_layout(
         title=dict(
             text=chart_title,
-            font=dict(size=12, color="#d0d6e0", family="Inter, -apple-system, sans-serif"),
+            font=dict(size=12, color="#3c4a5a", family="Segoe UI, Arial, sans-serif"),
             x=0.01,
             y=0.97
         ),
         xaxis=dict(
-            title=dict(text=x_meta["label"], font=dict(size=11, color="#8a8f98")),
+            title=dict(text=x_meta["label"], font=dict(size=11, color="#5b6775")),
             type="log" if x_meta["log"] else "linear",
             showgrid=True,
-            gridcolor="#1f2127",
+            gridcolor="#e3e6eb",
             gridwidth=1,
             zeroline=False,
-            tickfont=dict(size=10, color="#62666d")
+            tickfont=dict(size=10, color="#7a8593")
         ),
         yaxis=dict(
-            title=dict(text=y_meta["label"], font=dict(size=11, color="#8a8f98")),
+            title=dict(text=y_meta["label"], font=dict(size=11, color="#5b6775")),
             type="log" if y_meta["log"] else "linear",
             showgrid=True,
-            gridcolor="#1f2127",
+            gridcolor="#e3e6eb",
             gridwidth=1,
             zeroline=False,
-            tickfont=dict(size=10, color="#62666d")
+            tickfont=dict(size=10, color="#7a8593")
         ),
-        plot_bgcolor="#0c0d0e",
-        paper_bgcolor="#0c0d0e",
+        plot_bgcolor="#ffffff",
+        paper_bgcolor="#ffffff",
         hoverlabel=dict(
-            bgcolor="#141517",
-            bordercolor="#23252a",
-            font=dict(size=11, color="#f7f8f8", family="Inter, monospace")
+            bgcolor="#ffffff",
+            bordercolor="#d9dde3",
+            font=dict(size=11, color="#1c2733", family="Segoe UI, Arial, sans-serif")
         ),
         legend=dict(
-            title=dict(text="MATERIAL FAMILIES", font=dict(size=9, color="#62666d")),
+            title=dict(text="Material families", font=dict(size=9, color="#7a8593")),
             orientation="h",
             yanchor="bottom",
             y=-0.38,
             xanchor="center",
             x=0.5,
-            font=dict(size=9, color="#8a8f98")
+            font=dict(size=9, color="#5b6775")
         ),
         margin=dict(l=55, r=30, t=45, b=90),
         height=480

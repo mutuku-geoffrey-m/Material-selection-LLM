@@ -57,7 +57,7 @@ If you are unsure, default to generic_mechanical_component.
 Respond with ONLY the exact string of the category. Do not add any other words or punctuation."""
 
     try:
-        model_name = os.getenv("LOCAL_MODEL_NAME", "llama3.2")
+        model_name = os.getenv("LOCAL_MODEL", "llama3.2:1b")
         req_data = json.dumps({
             "model": model_name,
             "prompt": f"User part: {prompt}",

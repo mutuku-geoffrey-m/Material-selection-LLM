@@ -142,7 +142,7 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
             "bed_temperature_max": 85,
             "enclosure_required": False,
             "warping_tendency": "Very Low",
-            "abrasive_nozzle_required": True,  # Critical engineering directive!
+            "abrasive_nozzle_required": True,  # Required for abrasive-filled filaments
             "recommended_nozzle_type": "Hardened Steel or Tungsten Carbide (>= 0.4mm, 0.6mm preferred)",
             "layer_adhesion_quality": "High",
             "hygroscopic_sensitivity": "Moderate",
@@ -150,7 +150,7 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
             "filament_drying_hours": 6
         },
         "surface_characteristics": {
-            "as_printed_ra_microns": 22.0,  # micro-texture from fiber extrusion increases boundary layer drag!
+            "as_printed_ra_microns": 22.0,  # fibre extrusion micro-texture increases boundary-layer drag
             "porosity_risk": "Moderate",
             "water_permeability_untreated": "Moderate (inter-bead voids present)"
         },
@@ -576,7 +576,7 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
         "glass_transition_temp": 1083.0,
         "melting_point_c": 1083.0,  # Solidus °C
         "heat_deflection_temp": 350.0,  # °C
-        "thermal_conductivity": 390.0,  # W/(m·K) (KING of heat conduction!)
+        "thermal_conductivity": 390.0,  # W/(m·K), highest conductivity among common engineering metals
         "specific_heat_capacity": 385.0,  # J/(kg·K)
         "water_absorption_24h": 0.0,
         "water_saturation_tensile_drop": 0.0,
@@ -725,7 +725,7 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
         "fatigue_strength_limit": 60.0,  # MPa
         "glass_transition_temp": 143.0,
         "melting_point_c": 343.0,  # °C
-        "heat_deflection_temp": 250.0,  # °C at 0.45 MPa (continuous service up to 260°C!)
+        "heat_deflection_temp": 250.0,  # °C at 0.45 MPa (continuous service up to 260 °C)
         "thermal_conductivity": 0.25,  # W/(m·K)
         "specific_heat_capacity": 1340.0,  # J/(kg·K)
         "water_absorption_24h": 0.06,  # %
@@ -762,12 +762,12 @@ MATERIALS_DATABASE: Dict[str, Dict[str, Any]] = {
         "name": "Thermoplastic Polyurethane (TPU 95A)",
         "family": "Elastomeric Polymer",
         "density": 1210.0,  # kg/m^3
-        "youngs_modulus_iso": 0.05,  # GPa (50 MPa - extremely compliant!)
+        "youngs_modulus_iso": 0.05,  # GPa (50 MPa), very compliant
         "youngs_modulus_print_xy": 0.05,
         "youngs_modulus_print_z": 0.048,
         "yield_strength": 15.0,  # MPa
         "ultimate_tensile_strength": 35.0,  # MPa
-        "tensile_strength_z": 32.0,  # (near-isotropic layer adhesion!)
+        "tensile_strength_z": 32.0,  # near-isotropic layer adhesion
         "flexural_modulus": 0.06,  # GPa
         "flexural_strength": 20.0,  # MPa
         "elongation_at_break": 500.0,  # % (huge elastic strain capacity)

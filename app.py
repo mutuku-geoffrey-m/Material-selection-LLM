@@ -1,9 +1,9 @@
 """
 Engineering Material Selection & Optimization System (EMS-OS)
-CAD/CAE Engineering Workbench & Analytical Optimization Console.
+Engineering Materials Selection System: Streamlit interface.
 
 Grounded in Michael F. Ashby's multi-objective continuum mechanics,
-1,490+ standardized materials database (ASTM, ISO, ASME, DIN, JIS),
+standardized materials database (ASTM, ISO, ASME, DIN, JIS),
 local Ollama base LLM, automatic Cloud Gemini internet arbitration,
 and Wilson-Harris Economic Order Quantity (EOQ) supply chain analytics.
 
@@ -32,6 +32,7 @@ from src.ashby_engine import (
 )
 from src.hydrodynamics import HydrodynamicsEngine
 from src.nlp_parser import NLPTranslationLayer
+from src.llm_intent import model_status, understand
 from src.rag_engine import RAGEngine
 from src.llm_orchestrator import LLMOrchestrator
 from src.economics_engine import EconomicsEngine
@@ -40,39 +41,37 @@ from src.report_generator import EngineeringReportGenerator
 
 # Page Configuration
 st.set_page_config(
-    page_title="EMS-OS // Engineering Material Selection Console",
+    page_title="EMS-OS | Engineering Materials Selection System",
     page_icon="O",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Linear / ClickHouse Production CAD-CAE Workbench Styling
+# Interface styling
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
     :root {
-        --canvas: #0c0d0e;
-        --surface-1: #141517;
-        --surface-2: #18191b;
-        --surface-3: #202225;
-        --hairline: #23252a;
-        --hairline-strong: #34343a;
-        --ink: #f7f8f8;
-        --ink-muted: #d0d6e0;
-        --ink-subtle: #8a8f98;
-        --ink-tertiary: #62666d;
-        --accent: #5e6ad2;
-        --accent-hover: #717de0;
-        --success: #22c55e;
-        --warning: #f59e0b;
-        --danger: #ef4444;
+        --canvas: #f4f5f7;
+        --surface-1: #ffffff;
+        --surface-2: #f8f9fb;
+        --surface-3: #eceff3;
+        --hairline: #d9dde3;
+        --hairline-strong: #bcc3cd;
+        --ink: #1c2733;
+        --ink-muted: #3c4a5a;
+        --ink-subtle: #5b6775;
+        --ink-tertiary: #7a8593;
+        --accent: #1f3a5f;
+        --accent-hover: #2d5080;
+        --success: #2e6b4f;
+        --warning: #8a5a14;
+        --danger: #9b2c2c;
     }
 
     html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: var(--canvas) !important;
         color: var(--ink) !important;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
     }
 
     [data-testid="stSidebar"] {
@@ -82,7 +81,7 @@ st.markdown("""
 
     /* Headings */
     h1, h2, h3, h4, h5, h6 {
-        font-family: 'Inter', sans-serif !important;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
         font-weight: 600 !important;
         color: var(--ink) !important;
         letter-spacing: -0.02em !important;
@@ -101,14 +100,14 @@ st.markdown("""
         justify-content: space-between;
         gap: 12px;
         font-size: 12px;
-        font-family: 'Inter', sans-serif;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     }
 
     .telemetry-title {
         font-weight: 600;
         color: var(--ink);
         letter-spacing: 0.02em;
-        text-transform: uppercase;
+        text-transform: none;
         font-size: 11px;
     }
 
@@ -141,7 +140,7 @@ st.markdown("""
         border-radius: 4px;
         padding: 2px 8px;
         color: var(--ink-muted);
-        font-family: 'JetBrains Mono', monospace;
+        font-family: Consolas, "Courier New", monospace;
         font-size: 11px;
     }
 
@@ -157,7 +156,7 @@ st.markdown("""
     .wb-card-header {
         font-size: 11px;
         font-weight: 600;
-        text-transform: uppercase;
+        text-transform: none;
         letter-spacing: 0.05em;
         color: var(--ink-subtle);
         margin-bottom: 12px;
@@ -201,7 +200,7 @@ st.markdown("""
     .stat-label {
         font-size: 11px;
         color: var(--ink-subtle);
-        text-transform: uppercase;
+        text-transform: none;
         letter-spacing: 0.04em;
         margin-bottom: 4px;
     }
@@ -210,7 +209,7 @@ st.markdown("""
         font-size: 16px;
         font-weight: 600;
         color: var(--ink);
-        font-family: 'JetBrains Mono', monospace;
+        font-family: Consolas, "Courier New", monospace;
         font-variant-numeric: tabular-nums;
     }
 
@@ -223,26 +222,26 @@ st.markdown("""
     /* Status Badge */
     .badge-verified {
         display: inline-block;
-        background-color: rgba(34, 197, 94, 0.1);
-        border: 1px solid rgba(34, 197, 94, 0.25);
-        color: #4ade80;
+        background-color: rgba(46, 107, 79, 0.08);
+        border: 1px solid rgba(46, 107, 79, 0.30);
+        color: #2e6b4f;
         padding: 2px 7px;
         border-radius: 3px;
         font-size: 11px;
         font-weight: 500;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: Consolas, "Courier New", monospace;
     }
 
     .badge-arbitrated {
         display: inline-block;
-        background-color: rgba(94, 106, 210, 0.15);
-        border: 1px solid rgba(94, 106, 210, 0.3);
-        color: #a5b4fc;
+        background-color: rgba(31, 58, 95, 0.08);
+        border: 1px solid rgba(31, 58, 95, 0.25);
+        color: #4a6c96;
         padding: 2px 7px;
         border-radius: 3px;
         font-size: 11px;
         font-weight: 500;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: Consolas, "Courier New", monospace;
     }
 
     .badge-neutral {
@@ -253,7 +252,7 @@ st.markdown("""
         padding: 2px 7px;
         border-radius: 3px;
         font-size: 11px;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: Consolas, "Courier New", monospace;
     }
 
     /* Form Controls and Inputs */
@@ -262,7 +261,7 @@ st.markdown("""
         border: 1px solid var(--hairline) !important;
         border-radius: 4px !important;
         color: var(--ink) !important;
-        font-family: 'Inter', sans-serif !important;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
         font-size: 13px !important;
     }
 
@@ -291,21 +290,21 @@ st.markdown("""
 
     .stButton > button[kind="primary"] {
         background-color: var(--accent) !important;
-        border: 1px solid #717de0 !important;
+        border: 1px solid #2d5080 !important;
         color: #ffffff !important;
         font-weight: 600 !important;
     }
 
     .stButton > button[kind="primary"]:hover {
         background-color: var(--accent-hover) !important;
-        border-color: #828fff !important;
+        border-color: #2d5080 !important;
     }
 
     /* Data Table Styling */
     [data-testid="stDataFrame"] {
         border: 1px solid var(--hairline) !important;
         border-radius: 4px !important;
-        font-family: 'JetBrains Mono', monospace !important;
+        font-family: Consolas, "Courier New", monospace !important;
         font-variant-numeric: tabular-nums !important;
     }
 
@@ -339,7 +338,7 @@ st.markdown("""
 
     /* Code blocks */
     code, pre {
-        font-family: 'JetBrains Mono', monospace !important;
+        font-family: Consolas, "Courier New", monospace !important;
         background-color: var(--surface-2) !important;
         border-radius: 4px !important;
         font-size: 12px !important;
@@ -373,43 +372,27 @@ current_session = st.session_state.engineering_sessions[st.session_state.active_
 
 # Sidebar: System Infrastructure & Material Catalog
 st.sidebar.markdown("""
-<div style="padding: 4px 0 16px 0; border-bottom: 1px solid #23252a; margin-bottom: 16px;">
-    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #f7f8f8;">EMS-OS // WORKBENCH</div>
-    <div style="font-size: 11px; color: #8a8f98;">Materials Optimization Console v2.4</div>
+<div style="padding: 4px 0 16px 0; border-bottom: 1px solid #d9dde3; margin-bottom: 16px;">
+    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #1c2733;">EMS-OS</div>
+    <div style="font-size: 11px; color: #5b6775;">Engineering Materials Selection System</div>
 </div>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=25, show_spinner=False)
+@st.cache_data(ttl=10, show_spinner=False)
 def check_cached_ollama_health(endpoint: str, model_name: str) -> dict:
-    try:
-        req = urllib.request.Request(f"{endpoint}/api/tags", headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=3.0) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            models = [m.get("name") for m in data.get("models", [])]
-            return {
-                "online": True,
-                "endpoint": endpoint,
-                "models": models,
-                "target_model_ready": any(model_name in m for m in models)
-            }
-    except Exception as e:
-        return {
-            "online": False,
-            "endpoint": endpoint,
-            "models": [],
-            "target_model_ready": False,
-            "error": str(e)
-        }
+    status = model_status(endpoint, model_name)
+    return {"online": status["daemon"], "endpoint": endpoint, "models": status["installed_models"],
+            "target_model_ready": status["installed"]}
 
 
 # Engine Selection
-st.sidebar.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8a8f98; margin-bottom: 6px;'>Inference Daemon Pipeline</div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 6px;'>Inference Route</div>", unsafe_allow_html=True)
 
 mode_choice = st.sidebar.selectbox(
     "Inference Route",
     [
-        "Local Standalone LLM (llama3.2 via Ollama) [Primary]",
-        "Deterministic Physics & Metallurgy Solver [Instant < 0.2s]",
+        "Local language model (llama3.2:1b via Ollama) [Primary]",
+        "Deterministic rule-based solver (no language model)",
         "Cloud API (Google Gemini / OpenAI)"
     ],
     index=0,
@@ -417,8 +400,8 @@ mode_choice = st.sidebar.selectbox(
 )
 
 mode_map = {
-    "Local Standalone LLM (llama3.2 via Ollama) [Primary]": LLMOrchestrator.MODE_LOCAL,
-    "Deterministic Physics & Metallurgy Solver [Instant < 0.2s]": LLMOrchestrator.MODE_AUTONOMOUS_EXPERT,
+    "Local language model (llama3.2:1b via Ollama) [Primary]": LLMOrchestrator.MODE_LOCAL,
+    "Deterministic rule-based solver (no language model)": LLMOrchestrator.MODE_AUTONOMOUS_EXPERT,
     "Cloud API (Google Gemini / OpenAI)": LLMOrchestrator.MODE_CLOUD
 }
 
@@ -427,28 +410,18 @@ ollama_endpoint = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 ollama_health = check_cached_ollama_health(ollama_endpoint, orchestrator.local_model)
 
 # Status strip in sidebar
-if ollama_health["online"]:
-    st.sidebar.markdown(f"""
-    <div style="background-color: #18191b; border: 1px solid #23252a; border-radius: 4px; padding: 8px 10px; margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #f7f8f8; font-weight: 500;">
-            <span class="telemetry-dot-online"></span> Ollama Daemon: Online
-        </div>
-        <div style="font-size: 10px; color: #8a8f98; margin-top: 2px; font-family: 'JetBrains Mono', monospace;">
-            Model: {orchestrator.local_model} ({ollama_health['endpoint']})
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+if not ollama_health["online"]:
+    state_color, state_line, state_hint = "#9b2c2c", "Ollama service: not running", "Start it with <code>ollama serve</code> or reopen the launcher."
+elif not ollama_health["target_model_ready"]:
+    state_color, state_line, state_hint = "#8a5a14", "Ollama service: running, model not installed", f"Install it with <code>ollama pull {orchestrator.local_model}</code>."
 else:
-    st.sidebar.markdown("""
-    <div style="background-color: #18191b; border: 1px solid #34343a; border-radius: 4px; padding: 8px 10px; margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #ef4444; font-weight: 500;">
-            <span class="telemetry-dot-offline"></span> Ollama Daemon: Offline
-        </div>
-        <div style="font-size: 10px; color: #8a8f98; margin-top: 2px;">
-            Execute <code>ollama serve</code> in terminal.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    state_color, state_line, state_hint = "#2e6b4f", "Ollama service: ready", f"Model {orchestrator.local_model} is installed."
+st.sidebar.markdown(f"""
+<div style="background-color: #f8f9fb; border: 1px solid #d9dde3; border-left: 3px solid {state_color}; border-radius: 3px; padding: 8px 10px; margin-bottom: 16px;">
+    <div style="font-size: 12px; color: #1c2733; font-weight: 600;">{state_line}</div>
+    <div style="font-size: 11px; color: #5b6775; margin-top: 3px;">{state_hint}</div>
+</div>
+""", unsafe_allow_html=True)
 
 # Cloud Arbitration Key
 with st.sidebar.expander("Cloud Internet Arbitration (Gemini)", expanded=False):
@@ -462,12 +435,12 @@ with st.sidebar.expander("Cloud Internet Arbitration (Gemini)", expanded=False):
     )
     if gemini_key:
         orchestrator.cloud_api_key = gemini_key
-        st.markdown("<span style='font-size: 11px; color: #4ade80;'>Connected for live internet tie-breaking.</span>", unsafe_allow_html=True)
+        st.markdown("<span style='font-size: 11px; color: #2e6b4f;'>Connected for live internet tie-breaking.</span>", unsafe_allow_html=True)
 
-st.sidebar.markdown("<div style='border-top: 1px solid #23252a; margin: 16px 0;'></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='border-top: 1px solid #d9dde3; margin: 16px 0;'></div>", unsafe_allow_html=True)
 
 # Design Sessions Manager
-st.sidebar.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8a8f98; margin-bottom: 8px;'>Design Cases & History</div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;'>Design Cases & History</div>", unsafe_allow_html=True)
 
 if st.sidebar.button("+ New Design Case", use_container_width=True):
     new_id = str(uuid.uuid4())[:8]
@@ -503,7 +476,7 @@ if len(st.session_state.engineering_sessions) > 1:
         st.session_state.active_session_id = fresh_id
         st.rerun()
 
-st.sidebar.markdown("<div style='border-top: 1px solid #23252a; margin: 16px 0;'></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='border-top: 1px solid #d9dde3; margin: 16px 0;'></div>", unsafe_allow_html=True)
 
 # Catalog Property Inspector
 with st.sidebar.expander("Material Database Inspector", expanded=False):
@@ -522,12 +495,12 @@ with st.sidebar.expander("Material Database Inspector", expanded=False):
         - **Raw Cost:** `${m_info.get('cost_per_kg_usd', 0):.2f} / kg`
         """)
 
-st.sidebar.markdown("<div style='border-top: 1px solid #23252a; margin: 16px 0;'></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='border-top: 1px solid #d9dde3; margin: 16px 0;'></div>", unsafe_allow_html=True)
 st.sidebar.markdown(f"""
-<div style="font-size: 11px; color: #62666d; line-height: 1.5;">
-    Indexed Materials: <strong style="color: #8a8f98;">{len(MATERIALS_DATABASE):,}</strong><br>
-    Standards: <strong style="color: #8a8f98;">ASTM / ISO / ASME / DIN / JIS</strong><br>
-    Optimization: <strong style="color: #8a8f98;">Ashby Multi-Objective</strong>
+<div style="font-size: 11px; color: #7a8593; line-height: 1.5;">
+    Indexed Materials: <strong style="color: #5b6775;">{len(MATERIALS_DATABASE):,}</strong><br>
+    Standards: <strong style="color: #5b6775;">ASTM / ISO / ASME / DIN / JIS</strong><br>
+    Optimization: <strong style="color: #5b6775;">Ashby Multi-Objective</strong>
 </div>
 """, unsafe_allow_html=True)
 
@@ -536,22 +509,22 @@ st.sidebar.markdown(f"""
 st.markdown(f"""
 <div class="telemetry-bar">
     <div style="display: flex; align-items: center; gap: 10px;">
-        <span class="telemetry-title">EMS-OS // Materials Optimization Console</span>
-        <span class="badge-neutral">ISO 527 // ASTM E466 // ASME VIII</span>
+        <span class="telemetry-title">EMS-OS: Engineering Materials Selection System</span>
+        <span class="badge-neutral">ISO 527 · ASTM E466 · ASME VIII</span>
     </div>
     <div style="display: flex; align-items: center; gap: 14px;">
         <div class="telemetry-item">
             <span class="{'telemetry-dot-online' if ollama_health['online'] else 'telemetry-dot-offline'}"></span>
-            <span>Ollama: <strong style="color: #d0d6e0;">{orchestrator.local_model}</strong></span>
+            <span>Ollama: <strong style="color: #3c4a5a;">{orchestrator.local_model}</strong></span>
         </div>
         <div class="telemetry-item">
-            <span>Catalog: <strong style="color: #d0d6e0;">{len(MATERIALS_DATABASE):,} Grades</strong></span>
+            <span>Catalog: <strong style="color: #3c4a5a;">{len(MATERIALS_DATABASE):,} Grades</strong></span>
         </div>
         <div class="telemetry-item">
-            <span>Methodology: <strong style="color: #d0d6e0;">Ashby Continuum</strong></span>
+            <span>Methodology: <strong style="color: #3c4a5a;">Ashby Continuum</strong></span>
         </div>
         <div class="telemetry-item">
-            <span>Sourcing: <strong style="color: #d0d6e0;">Wilson-Harris EOQ</strong></span>
+            <span>Sourcing: <strong style="color: #3c4a5a;">Wilson-Harris EOQ</strong></span>
         </div>
     </div>
 </div>
@@ -566,7 +539,7 @@ with col_left:
     st.markdown("""
     <div class="wb-card-header">
         <span>Design Specification & Boundary Constraints</span>
-        <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #62666d;">PANEL 01 // INPUT</span>
+        <span style="font-family: Consolas, "Courier New", monospace; font-size: 10px; color: #7a8593;">Design Specification</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -585,13 +558,13 @@ with col_left:
 
     with st.expander("Engineering User Manual & Exploration Guide", expanded=False):
         st.markdown("""
-        **Welcome to the EMS-OS Materials Optimization Console.** This system is **open-ended**—you can evaluate any custom mechanical design brief or choose a pre-configured engineering benchmark.
+        **Welcome to EMS-OS, the Engineering Materials Selection System.** This system is **open-ended**—you can evaluate any custom mechanical design brief or choose a pre-configured engineering benchmark.
         
         **How to test and explore:**
         1. **Enter Your Design Brief:** Type any mechanical specification directly into the **Technical Engineering Design Brief** area below. Include the component function (e.g., *drone arm, pressure pipe, turbine runner*), stress/loading mode (e.g., *bending, tension, torsion, internal burst pressure*), operating environment (*temperatures, water immersion, UV, chemicals*), and any target standards (*ASTM, ISO, ASME*).
         2. **Use Presets (Optional):** Use the **Benchmark Library** dropdown below to load calibrated baseline test cases (e.g., Cryogenic Dewar Strut, High-Speed Spindle Shaft, Micro-Hydro Blade).
         3. **Set Parameters:** Choose your manufacturing scope (Universal or FDM 3D printing) and projected annual production demand in kg to evaluate Wilson-Harris batch sizes and local landed costs.
-        4. **Execute Optimization:** Click the **Execute Screening & Optimization** button to run continuum mechanics derivations, database filtering across 1,490+ materials, and techno-economic ranking.
+        4. **Execute Optimization:** Click the **Execute Screening & Optimization** button to run continuum mechanics derivations, database filtering across the materials catalogue, and techno-economic ranking.
         """)
 
     prompt_state_key = f"prompt_input_{st.session_state.active_session_id}"
@@ -630,7 +603,7 @@ with col_left:
     current_session["prompt"] = user_prompt
 
     # Structured Parameter Adjustments
-    st.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8a8f98; margin: 12px 0 8px 0;'>Boundary Condition Gating</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin: 12px 0 8px 0;'>Boundary Condition Gating</div>", unsafe_allow_html=True)
 
     c_bnd1, c_bnd2 = st.columns(2)
     with c_bnd1:
@@ -665,9 +638,10 @@ with col_left:
     execute_clicked = st.button("Execute Screening & Optimization", type="primary", use_container_width=True)
 
     if execute_clicked and user_prompt.strip():
-        with st.spinner("Executing Ashby continuum mechanics, screening 1,490+ materials, checking cloud arbitration, and optimizing supply chain…"):
+        with st.spinner("Interpreting the brief, screening the catalogue with Ashby indices and evaluating sourcing economics…"):
             # 1. Parse Scientific Prompt
-            nlp_spec = NLPTranslationLayer.parse_engineering_prompt(user_prompt)
+            use_language_model = (mode_map[mode_choice] == LLMOrchestrator.MODE_LOCAL) and ollama_health["target_model_ready"]
+            nlp_spec = understand(user_prompt, use_llm=use_language_model, base_url=ollama_endpoint, model=orchestrator.local_model)
 
             # Apply manual overrides if checked
             if mfg_scope == "FDM Additive Only":
@@ -736,25 +710,25 @@ with col_right:
         <div class="wb-card">
             <div class="wb-card-header">
                 <span>Multi-Objective Continuum Evaluation Engine</span>
-                <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #62666d;">AWAITING EXECUTION</span>
+                <span style="font-family: Consolas, "Courier New", monospace; font-size: 10px; color: #7a8593;">AWAITING EXECUTION</span>
             </div>
             <div style="padding: 24px 8px; text-align: center;">
-                <div style="font-size: 16px; font-weight: 600; color: #f7f8f8; margin-bottom: 8px;">Optimization Console Ready</div>
-                <div style="font-size: 13px; color: #8a8f98; max-width: 500px; margin: 0 auto 20px auto; line-height: 1.5;">
+                <div style="font-size: 16px; font-weight: 600; color: #1c2733; margin-bottom: 8px;">System ready</div>
+                <div style="font-size: 13px; color: #5b6775; max-width: 500px; margin: 0 auto 20px auto; line-height: 1.5;">
                     Select an engineering benchmark specification on the left or enter a custom design brief, then execute multi-objective optimization.
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: left; max-width: 580px; margin: 0 auto;">
-                    <div style="background-color: #141517; border: 1px solid #23252a; border-radius: 4px; padding: 12px;">
-                        <div style="font-size: 11px; font-weight: 600; color: #d0d6e0; text-transform: uppercase; margin-bottom: 4px;">Phase 1: Mechanics</div>
-                        <div style="font-size: 11px; color: #8a8f98;">Continuum loading derivations and governing Ashby index assignment.</div>
+                    <div style="background-color: #ffffff; border: 1px solid #d9dde3; border-radius: 4px; padding: 12px;">
+                        <div style="font-size: 11px; font-weight: 600; color: #3c4a5a; text-transform: none; margin-bottom: 4px;">Phase 1: Mechanics</div>
+                        <div style="font-size: 11px; color: #5b6775;">Continuum loading derivations and governing Ashby index assignment.</div>
                     </div>
-                    <div style="background-color: #141517; border: 1px solid #23252a; border-radius: 4px; padding: 12px;">
-                        <div style="font-size: 11px; font-weight: 600; color: #d0d6e0; text-transform: uppercase; margin-bottom: 4px;">Phase 2: Screening</div>
-                        <div style="font-size: 11px; color: #8a8f98;">Pareto boundary filtering across 1,490 standardized alloys and polymers.</div>
+                    <div style="background-color: #ffffff; border: 1px solid #d9dde3; border-radius: 4px; padding: 12px;">
+                        <div style="font-size: 11px; font-weight: 600; color: #3c4a5a; text-transform: none; margin-bottom: 4px;">Phase 2: Screening</div>
+                        <div style="font-size: 11px; color: #5b6775;">Pareto boundary filtering across the standardized materials catalogue.</div>
                     </div>
-                    <div style="background-color: #141517; border: 1px solid #23252a; border-radius: 4px; padding: 12px;">
-                        <div style="font-size: 11px; font-weight: 600; color: #d0d6e0; text-transform: uppercase; margin-bottom: 4px;">Phase 3: Sourcing</div>
-                        <div style="font-size: 11px; color: #8a8f98;">Wilson-Harris EOQ batch sizing, MOQ gating, and landed cost analytics.</div>
+                    <div style="background-color: #ffffff; border: 1px solid #d9dde3; border-radius: 4px; padding: 12px;">
+                        <div style="font-size: 11px; font-weight: 600; color: #3c4a5a; text-transform: none; margin-bottom: 4px;">Phase 3: Sourcing</div>
+                        <div style="font-size: 11px; color: #5b6775;">Wilson-Harris EOQ batch sizing, MOQ gating, and landed cost analytics.</div>
                     </div>
                 </div>
             </div>
@@ -782,9 +756,9 @@ with col_right:
             </div>
             <div class="material-headline-name">{top_mat['name']}</div>
             <div class="material-headline-sub">
-                Family: <strong style="color: #d0d6e0;">{top_mat.get('family', 'Standard Alloy')}</strong> &nbsp;|&nbsp; 
-                Governing Index: <strong style="color: #d0d6e0;">{ashby_spec.get('primary_governing_ashby_index', 'beam_stiffness')}</strong> &nbsp;|&nbsp;
-                Route: <strong style="color: #d0d6e0;">{bnd_spec.get('manufacturing_process', 'Universal Multi-Process')}</strong>
+                Family: <strong style="color: #3c4a5a;">{top_mat.get('family', 'Standard Alloy')}</strong> &nbsp;|&nbsp; 
+                Governing Index: <strong style="color: #3c4a5a;">{ashby_spec.get('primary_governing_ashby_index', 'beam_stiffness')}</strong> &nbsp;|&nbsp;
+                Route: <strong style="color: #3c4a5a;">{bnd_spec.get('manufacturing_process', 'Universal Multi-Process')}</strong>
             </div>
             <div class="stat-grid">
                 <div class="stat-box">
@@ -816,7 +790,7 @@ with col_right:
             st.markdown("""
             <div class="wb-card-header" style="margin-top: 12px;">
                 <span>Ashby Pareto Selection Space (Log-Log Coordinate Plane)</span>
-                <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #62666d;">FIGURE 01</span>
+                <span style="font-family: Consolas, "Courier New", monospace; font-size: 10px; color: #7a8593;">Figure 1</span>
             </div>
             """, unsafe_allow_html=True)
             st.plotly_chart(current_session["chart_fig"], use_container_width=True, key=f"chart_{st.session_state.active_session_id}")
@@ -832,7 +806,7 @@ with col_right:
 
         with tab1:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8a8f98; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
                 Analytical Derivation & Manufacturing Directives
             </div>
             """, unsafe_allow_html=True)
@@ -840,7 +814,7 @@ with col_right:
 
         with tab2:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8a8f98; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
                 Environmental Degradation Kinetic Verification
             </div>
             """, unsafe_allow_html=True)
@@ -875,7 +849,7 @@ with col_right:
 
         with tab3:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8a8f98; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
                 Techno-Economic Sourcing & Wilson-Harris EOQ Analytics
             </div>
             """, unsafe_allow_html=True)
@@ -916,11 +890,18 @@ with col_right:
 
         with tab4:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8a8f98; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
                 Engine Decision Provenance & Optimization Pipeline
             </div>
             """, unsafe_allow_html=True)
 
+            understanding = (spec or {}).get("understanding")
+            if understanding:
+                st.markdown("**Language understanding**")
+                st.caption(f"Interpretation source: {understanding['source']}" +
+                           (f" · {understanding['latency_s']:.1f} s" if understanding.get("model") else ""))
+                for note in understanding.get("notes", []):
+                    st.caption(note)
             thinking = res.get("thinking_process", [])
             if thinking:
                 for step in thinking:
@@ -929,13 +910,13 @@ with col_right:
 
             arb = res.get("arbitration_result")
             if arb and arb.get("arbitrated"):
-                st.markdown("<div style='border-top: 1px solid #23252a; margin: 12px 0;'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='border-top: 1px solid #d9dde3; margin: 12px 0;'></div>", unsafe_allow_html=True)
                 st.markdown(f"**Cloud Internet Tie-Breaking Arbitration ({arb.get('engine', 'Cloud AI')})**")
                 st.caption(arb.get("arbitration_notes", ""))
 
         with tab5:
             st.markdown("""
-            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #8a8f98; margin-bottom: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: none; color: #5b6775; margin-bottom: 8px;">
                 Verified ChromaDB Document Retrieval Chunks
             </div>
             """, unsafe_allow_html=True)
@@ -944,13 +925,13 @@ with col_right:
             if retrieved:
                 for i, chunk in enumerate(retrieved, 1):
                     meta = chunk.get("metadata") or {}
-                    st.markdown(f"**Chunk [{i}] // Document:** `{meta.get('document_title', 'ASTM/ISO Reference')}` &nbsp;|&nbsp; **Relevance:** `{chunk.get('score', 0):.3f}`")
+                    st.markdown(f"**Source {i} · Document:** `{meta.get('document_title', 'ASTM/ISO Reference')}` &nbsp;|&nbsp; **Relevance:** `{chunk.get('score', 0):.3f}`")
                     st.code(chunk.get("text", ""), language="markdown")
             else:
                 st.caption("No vector store chunks retrieved for active query.")
 
         # Export Report Section
-        st.markdown("<div style='border-top: 1px solid #23252a; margin: 20px 0 14px 0;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='border-top: 1px solid #d9dde3; margin: 20px 0 14px 0;'></div>", unsafe_allow_html=True)
         report_md = EngineeringReportGenerator.generate_markdown_report(res, spec)
         st.download_button(
             label="Export Technical Specification Report (Markdown)",

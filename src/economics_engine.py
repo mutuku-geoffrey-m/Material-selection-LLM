@@ -732,8 +732,12 @@ class EconomicsEngine:
         if max_tech_score <= 0:
             max_tech_score = 1.0
 
+        from src.materials_db import MATERIALS_DATABASE
+
         evaluated_list = []
         for mat in candidate_materials:
+            # Ranked entries carry only screening fields; price, availability and MOQ come from the catalogue record.
+            mat = {**MATERIALS_DATABASE.get(mat.get("key"), {}), **mat}
             tech_score_raw = float(mat.get("index_value", mat.get("final_metric", 1.0)))
             norm_tech_score = (tech_score_raw / max_tech_score) * 100.0
 

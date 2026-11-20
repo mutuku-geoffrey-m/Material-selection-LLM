@@ -34,7 +34,10 @@ def run_single_prompt(prompt: str, mode: str = LLMOrchestrator.MODE_LOCAL, verbo
 
     # 1. Scientific Specification Translation
     print("[1/3] Parsing Engineering Specification via NLP Translation Layer...")
-    spec = NLPTranslationLayer.parse_engineering_prompt(prompt)
+    from src.llm_intent import model_status, understand
+    use_language_model = mode == LLMOrchestrator.MODE_LOCAL and model_status()["installed"]
+    spec = understand(prompt, use_llm=use_language_model)
+    print(f"Interpretation: {spec['understanding']['source']}")
     ashby_info = spec["synthesized_engineering_spec"]
     boundary = spec["boundary_conditions_and_constraints"]
 

@@ -1,7 +1,7 @@
 """
 EMS-OS one-click launcher (Windows).
 
-First run : installs whatever is missing (Python, Ollama, project dependencies, llama3.2 model),
+First run : installs whatever is missing (Python, Ollama, project dependencies, llama3.2:1b model),
             creates a desktop shortcut, then opens the Streamlit workbench.
 Later runs: only checks that everything is still in place, starts Ollama / Streamlit if they are
             not already running, and opens the browser.
@@ -14,7 +14,7 @@ from pathlib import Path
 
 APP_PORT = int(os.getenv("STREAMLIT_SERVER_PORT", "8501"))
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-MODEL = os.getenv("LOCAL_MODEL", "llama3.2")
+MODEL = os.getenv("LOCAL_MODEL", "llama3.2:1b")
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 FROZEN = getattr(sys, "frozen", False)
@@ -179,10 +179,11 @@ def ensure_model(exe):
     except Exception:
         say("WARNING: could not query Ollama for installed models.")
         return
-    if any(n.split(":")[0] == MODEL.split(":")[0] for n in names):
+    wanted = MODEL if ":" in MODEL else MODEL + ":latest"
+    if wanted in names:
         say(f"Model {MODEL} is installed.")
     else:
-        say(f"Downloading model {MODEL} (about 2 GB, first run only) ...")
+        say(f"Downloading model {MODEL} (about 1.3 GB, first run only) ...")
         run([exe, "pull", MODEL])
 
 
@@ -271,7 +272,7 @@ def main():
 
     say(f"Launching the workbench at http://localhost:{APP_PORT}")
     proc = subprocess.Popen([str(VENV_PY), "-m", "streamlit", "run", "app.py",
-                             "--server.port", str(APP_PORT), "--server.headless", "true",
+                             "--server.port", str(APP_PORT), "--server.address", "127.0.0.1", "--server.headless", "true",
                              "--browser.gatherUsageStats", "false"], cwd=ROOT)
     for _ in range(90):
         if port_open(APP_PORT):

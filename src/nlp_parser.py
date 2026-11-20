@@ -7,6 +7,8 @@ engineering parameters, boundary conditions, and Ashby performance constraints.
 from typing import Dict, Any, List, Optional
 import os
 import re
+from src.text_matching import as_keyword_text
+from src.compatibility import detect_requested_family, media_exclusions, galvanic_advisory
 from src.ashby_engine import AshbyIndex, derive_selection_guide
 
 _ML_INTENT_MODEL = None
@@ -53,6 +55,27 @@ class NLPTranslationLayer:
 
     @classmethod
     def parse_engineering_prompt(cls, prompt: str) -> Dict[str, Any]:
+        """Rule-based interpretation of a design brief, including family restrictions and media compatibility."""
+        spec = cls._parse_rules(prompt)
+        cls.refresh_compatibility(spec, prompt)
+        return spec
+
+    @classmethod
+    def refresh_compatibility(cls, spec: Dict[str, Any], prompt: str) -> None:
+        """Derive the requested material family, excluded families and advisory notes from the brief."""
+        boundary = spec["boundary_conditions_and_constraints"]
+        family = boundary.get("requested_material_family") or detect_requested_family(prompt)
+        excluded, notes = media_exclusions(prompt, boundary.get("chemical_media", []))
+        advisories = list(notes)
+        galvanic = galvanic_advisory(prompt, family)
+        if galvanic:
+            advisories.append(galvanic)
+        boundary["requested_material_family"] = family
+        boundary["excluded_material_families"] = excluded
+        spec["advisories"] = advisories
+
+    @classmethod
+    def _parse_rules(cls, prompt: str) -> Dict[str, Any]:
         """
         Parse professional, scientific engineering prompts into verified mechanical
         engineering parameters, boundary conditions, and Ashby performance constraints.
@@ -60,7 +83,7 @@ class NLPTranslationLayer:
         governing ISO/ASTM/ASME standards, and explicit mechanical properties.
         """
         prompt_clean = prompt.strip()
-        prompt_lower = prompt_clean.lower()
+        prompt_lower = as_keyword_text(prompt_clean)
 
 
         # 1. Physical Domain & Function Identification
@@ -233,8 +256,8 @@ class NLPTranslationLayer:
                 except Exception:
                     pass
 
-        # Fallback to Semantic LLM Router (Ollama) for novel layman prompts
-        if not component_type or component_type == "generic_mechanical_component":
+        # Optional semantic router (disabled by default; the language-understanding layer supersedes it)
+        if (not component_type or component_type == "generic_mechanical_component") and os.getenv("EMS_ENABLE_ROUTER") == "1":
             try:
                 from src.semantic_router import ollama_semantic_classifier
                 ai_type = ollama_semantic_classifier(prompt_clean)

@@ -16,19 +16,23 @@
 
 ---
 
+
 ## 1. Project Overview
 
-In mechanical engineering design, material selection is a foundational step that governs product reliability, weight, manufacturing complexity, and total cost. With thousands of commercially standardized engineering materials cataloged under ANSI, ISO, DIN, JIS, and ASTM standards, identifying the single best material for a given load case requires simultaneous optimization across multiple conflicting criteria.
+Material selection governs the reliability, mass, manufacturability and cost of a mechanical component. Thousands of grades are standardised under ANSI, ISO, DIN, JIS and ASTM, and the choice for a given duty is rarely obvious. Classical selection relies on two-dimensional Ashby charts, which become difficult to apply when several constraints act together, such as bending stiffness, service temperature, chemical exposure and regional import logistics. General-purpose language models can discuss materials fluently, but they are not reliable sources of numerical property data and can recommend materials that are physically unsuitable.
 
-While classical selection methods rely on manual two-dimensional Ashby charts, this manual approach becomes difficult when scaling to multi-variable constraints (such as combined plate bending, high-temperature service limits, chemical exposure, and regional import logistics). Conversely, general-purpose Large Language Models (LLMs) cannot be relied upon for direct engineering calculations because they sample words probabilistically, leading to made-up material properties and incorrect physical scaling relationships.
+EMS-OS addresses this by separating language understanding from engineering calculation. A small local language model reads the design brief and returns a structured interpretation; every value it returns is validated against a closed vocabulary and against the text of the brief, and a rule-based parser provides the fallback and cross-check. All screening, ranking and costing is then performed by deterministic code, so the numerical result does not depend on the language model.
 
-This software system, developed as our final year engineering project, addresses this problem through a decoupled architecture:
-1. **Natural Language Translation:** A parser extracts mechanical requirements (load type, geometry, temperature limits, chemical exposures, and industry standards) from technical prompts.
-2. **Boolean Physical Gating:** Filters out materials that fail hard physical constraints (e.g., optical transparency, cryogenic ductile-to-brittle limits, or non-magnetic requirements).
-3. **Deterministic Ashby Calculation Engine:** Calculates analytical Michael F. Ashby performance indices across an expanded, unit-normalized database of 1,490 standardized engineering materials using pure numerical formulas in Python.
-4. **Techno-Economic Sourcing & Logistics Module:** Calculates the realistic Delivered Duty Paid (DDP) cost to Nairobi via Kilindini Port (Mombasa), accounting for maritime freight, East African Community Common External Tariffs (EAC CET), Import Declaration Fees, Railway Development Levies, VAT, Mombasa port handling, and Standard Gauge Railway (SGR) rail haulage. It also models stochastic safety stock and Wilson-Harris Economic Order Quantities.
-5. **TOPSIS Multi-Criteria Decision Analysis:** Ranks candidate materials by balancing mechanical performance, landed cost, lead time, and supply availability using vector-normalized TOPSIS.
-6. **Local LLM Synthesis:** Uses a local offline language model (`llama3.2` running via Ollama) to synthesize practical machining, heat-treatment, and failure-prevention notes based on verified data sheets retrieved from a local ChromaDB store.
+The pipeline comprises the following stages.
+
+1. **Language understanding.** The local model (`llama3.2:1b`, served by Ollama) extracts the component type, governing load case, service temperature and pressure, environment, chemical media and any restriction to a material family. Output is constrained to a JSON schema and validated; if the model is unavailable the rule-based parser is used and the report states which interpretation was applied.
+2. **Physical gating.** Materials that cannot satisfy hard constraints are removed, including service temperature, cryogenic ductility, optical transparency, non-magnetic service, requested family and chemical compatibility (for example liquid gallium against aluminium and copper).
+3. **Ashby screening.** Analytical Ashby indices are evaluated for the governing load case over the materials catalogue.
+4. **Techno-economic evaluation.** Delivered Duty Paid cost to Nairobi via Mombasa is computed from each material's price, with freight, insurance, EAC customs duty, Import Declaration Fee, Railway Development Levy, VAT, port handling and clearance, together with lead-time safety stock and economic order quantity.
+5. **Multi-criteria ranking.** Candidates are ranked by vector-normalised TOPSIS over performance, landed cost, lead time and supply availability.
+6. **Report generation.** A report with manufacturing directives, advisories and sourcing analysis is produced. The local model contributes optional commentary after the ranking is complete; a missing or slow model never changes the ranking.
+
+The materials catalogue contains 1,510 grades: 1,490 catalogue records and 20 curated reference grades defined in `src/materials_db.py`. The count shown in the interface is read from the database at run time.
 
 ---
 
@@ -81,228 +85,127 @@ Where:
 
 ---
 
+
 ## 3. Repository Structure
 
 ```
 .
-├── app.py                     # Streamlit user interface (Engineering Workbench)
-├── cli.py                     # Headless command-line interface
-├── requirements.txt           # Python package dependencies
-├── .env.example               # Environment variables template
-├── .streamlit/
-│   └── config.toml            # Workbench theme and server configuration
-├── data/
-│   ├── materials_catalog.json           # Curated database of 1,490 engineering materials
-│   └── engineering_intent_dataset.json   # Intent classification dataset
-├── knowledge_base/                      # Technical documentation and standards
-│   ├── ashby_methodology.md
-│   ├── metals_and_alloys_selection.md
-│   ├── advanced_composites_and_polymers.md
-│   ├── hydrodynamic_surface_roughness_and_epoxy.md
-│   ├── micro_hydro_kenya_case_study.md
-│   ├── polymer_degradation_water_uv.md
-│   ├── fdm_additive_manufacturing_constraints.md
-│   └── materials_data_sheets.md
+├── app.py                         Streamlit user interface
+├── cli.py                         Command-line interface
+├── EMS-OS.exe                     One-click launcher (built with launcher/build_exe.bat)
+├── Start_EMS-OS.bat               Launcher fallback when the executable has not been built
+├── requirements.txt               Python dependencies
+├── .env.example                   Configuration template
+├── .streamlit/config.toml         Interface theme and server settings
 ├── launcher/
-│   ├── launcher.py                      # One-click setup and start script (source of EMS-OS.exe)
-│   └── build_exe.bat                    # Builds EMS-OS.exe with PyInstaller
-├── Start_EMS-OS.bat                     # Fallback launcher (needs Python installed)
-├── models/
-│   └── nlp_intent_model.json            # Trained intent classifier used by the parser
+│   ├── launcher.py                Installation and start-up logic
+│   └── build_exe.bat              Builds EMS-OS.exe with PyInstaller
+├── data/
+│   ├── materials_catalog.json     Catalogue of 1,490 engineering materials
+│   └── engineering_intent_dataset.json   Training data for the intent classifier
+├── models/nlp_intent_model.json   Trained intent classifier used by the rule-based parser
+├── knowledge_base/                Reference documents indexed in the vector store
 ├── scripts/
-│   ├── build_materials_catalog.py       # Catalog generator and normalizer
-│   └── run_benchmark_full_pipeline.py   # Runs the 100 scenarios through the app pipeline to CSV
-├── tests/
-│   ├── test_ashby_tolerance.py          # Ashby indices vs. reference formulas (1e-5 tolerance)
-│   ├── test_topsis_sensitivity.py       # TOPSIS weight-sensitivity analysis
-│   └── test_100_benchmarks.py           # 100-scenario functional and latency benchmark
-└── src/
-    ├── __init__.py
-    ├── ashby_engine.py       # Deterministic continuum mechanics equations
-    ├── economics_engine.py   # Incoterms 2020 DDP, EOQ, Safety Stock, TOPSIS
-    ├── hydrodynamics.py      # Fluid shear and surface roughness calculations
-    ├── llm_orchestrator.py   # Decoupled inference and external API orchestrator
-    ├── materials_db.py       # Database loading, filtering, and property lookup
-    ├── nlp_parser.py         # Engineering requirement extraction from text
-    ├── rag_engine.py         # ChromaDB semantic retrieval engine
-    ├── report_generator.py   # Markdown technical report generation
-    ├── semantic_router.py    # Query intent routing
-    └── train_nlp.py          # Intent classification training
+│   ├── build_materials_catalog.py        Catalogue generation and normalisation
+│   └── run_benchmark_full_pipeline.py    Runs the 100 benchmark scenarios and writes a review table
+├── src/
+│   ├── ashby_engine.py            Ashby indices, screening and chart generation
+│   ├── compatibility.py           Family membership, chemical compatibility and advisories
+│   ├── economics_engine.py        Landed cost, safety stock, EOQ, Kraljic classification and TOPSIS
+│   ├── hydrodynamics.py           Fluid loading and surface-roughness calculations
+│   ├── llm_intent.py              Language understanding with validation
+│   ├── llm_orchestrator.py        Pipeline orchestration and report synthesis
+│   ├── materials_db.py            Database loading and property access
+│   ├── nlp_parser.py              Rule-based interpretation of design briefs
+│   ├── rag_engine.py              ChromaDB retrieval
+│   ├── report_generator.py        Markdown report export
+│   ├── semantic_router.py         Optional intent router (disabled by default)
+│   ├── text_matching.py           Boundary-aware keyword matching
+│   └── train_nlp.py               Intent classifier training
+└── tests/                         Unit, tolerance, sensitivity and benchmark tests
 ```
 
 ---
 
-## 3a. Quick Start (Windows, one click)
+## 4. Installation
 
-Double-click **`EMS-OS.exe`** (or `Start_EMS-OS.bat` if the exe has not been built). On the first run it installs whatever is missing (Python 3.12, Ollama, the project dependencies and the `llama3.2` model), creates an `EMS-OS` shortcut on the Desktop and opens the workbench at `http://localhost:8501`. Later runs, from the exe or the shortcut, only start the required services and open the browser. To rebuild the exe, run `launcher\build_exe.bat`.
+### 4.1 One-click start (Windows)
 
-Timeouts for the optional language-model features are configurable in `.env`: `EMS_LLM_TIMEOUT_S` (local commentary, default 120), `EMS_ROUTER_TIMEOUT_S` (intent router, default 20) and `EMS_CLOUD_TIMEOUT_S` (cloud arbitration, default 20). Rankings and landed-cost figures are computed deterministically and do not depend on them.
+Run `EMS-OS.exe` (or `Start_EMS-OS.bat` if the executable has not been built). On first use the launcher installs any missing component (Python 3.12, Ollama, the Python dependencies and the `llama3.2:1b` model, approximately 1.3 GB), creates an `EMS-OS` shortcut on the desktop and opens the interface at `http://localhost:8501`. On later runs it only verifies the installation, starts Ollama and the interface if they are not running, loads the model into memory and opens the browser. Progress is printed in the launcher window and recorded in `launcher.log`. The first run requires an internet connection; afterwards the system operates offline except for the optional cloud arbitration.
 
-Cloud/second-opinion arbitration triggers automatically when the top two candidates are within 8% on the governing Ashby index; it uses the Gemini key if one is set in `.env`, otherwise the local model.
+To rebuild the executable, run `launcher\build_exe.bat` on a Windows computer with Python installed.
 
-Run the tests with `python -m unittest discover -s tests`.
+### 4.2 Manual installation
 
----
+1. Install [Ollama](https://ollama.com) and download the model: `ollama pull llama3.2:1b`.
+2. Create and activate a virtual environment: `python -m venv .venv`, then `.venv\Scripts\activate` (Windows) or `source .venv/bin/activate` (Linux, macOS).
+3. Install the dependencies: `pip install -r requirements.txt`.
+4. Copy `.env.example` to `.env` and adjust the values if required.
 
-## 4. System Requirements & Installation
+### 4.3 Configuration
 
-### Prerequisites
-- Python 3.10, 3.11, or 3.12
-- [Ollama](https://ollama.com/) (for running the local LLM offline)
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `LOCAL_MODEL` | `llama3.2:1b` | Ollama model used for language understanding and commentary |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint |
+| `EMS_UNDERSTANDING_TIMEOUT_S` | 120 | Time allowed for the model to interpret a brief |
+| `EMS_LLM_TIMEOUT_S` | 120 | Idle timeout for streamed commentary |
+| `EMS_CLOUD_TIMEOUT_S` | 20 | Timeout for optional cloud arbitration |
+| `GEMINI_API_KEY`, `OPENAI_API_KEY` | empty | Optional keys for cloud arbitration of near-ties |
+| `STREAMLIT_SERVER_PORT` | 8501 | Interface port |
 
-### Step 1: Install Ollama and Pull the Model
-Download and install Ollama from the official website. Then, from your terminal:
-```bash
-ollama pull llama3.2
-```
-Keep Ollama running in the background.
+Cloud arbitration runs automatically when the top two candidates differ by no more than 8 % on the governing index; it uses the configured API key or, if none is set, the local model.
 
-### Step 2: Clone the Repository & Set Up Virtual Environment
-```bash
-git clone https://github.com/mutuku-geoffrey-m/Material-selection-LLM.git
-cd Material-selection-LLM
+### 4.4 Troubleshooting
 
-# On Windows:
-python -m venv .venv
-.venv\Scripts\activate
-
-# On Linux / macOS:
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### Step 3: Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### Step 4: Configure Environment Variables
-Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-The application runs completely offline using the local Ollama instance (`http://localhost:11434`). If you wish to test cloud model arbitration, you can optionally provide an API key in `.env`.
+- **Interface reports that the model is not installed.** Run `ollama pull llama3.2:1b`, or reopen the launcher, which installs it.
+- **No commentary in the report.** The report states the reason. Confirm with `ollama list` that the service is running and the model is present; the first request after start-up is slower because the model is being loaded.
+- **Port 8501 in use.** Set `STREAMLIT_SERVER_PORT` in `.env`.
+- **Launcher problems.** Consult `launcher.log` in the project folder.
 
 ---
 
-### Low-memory computers (8 GB RAM)
-`llama3.2` (3B, about 2 GB) fits in 8 GB, but on a CPU-only laptop it writes roughly 3-8 tokens per second, so commentary can take a minute or two (output is streamed; the timeout only triggers if no text arrives for `EMS_LLM_TIMEOUT_S` seconds). To make it faster:
-1. Close the browser tabs and other heavy programs while running.
-2. Use the 1B model: run `ollama pull llama3.2:1b` and set `LOCAL_MODEL=llama3.2:1b` in `.env` (about 2-3 times faster, shorter commentary).
-3. Keep the launcher window open so the model stays loaded between queries.
-The material ranking and costs never wait for the model and are always produced first.
+## 5. Operation
 
-### Troubleshooting
-- **No LLM commentary in the report:** the report says why. Check that Ollama is running (`ollama list`) and that `llama3.2` is installed; the first request after a cold start can be slow, so raise `EMS_LLM_TIMEOUT_S` in `.env` if needed. Rankings and costs are unaffected.
-- **Port 8501 busy:** set `STREAMLIT_SERVER_PORT` in `.env` or close the other Streamlit window.
-- **Launcher problems:** see `launcher.log` in the project folder.
+### 5.1 Web interface
+
+Start the interface with the launcher, or with `streamlit run app.py`. Enter a design brief in natural language or select a benchmark example, set the manufacturing route, annual demand and environmental conditions, and run the optimisation. The result panels present the governing specification, the Ashby selection chart, the comparative evaluation, the sourcing and economic order quantity analysis, the decision provenance (including which interpretation of the brief was applied) and the retrieved reference documents.
+
+A brief is interpreted most reliably when it states the loading mode and geometry, the service temperature and pressure, the environment and fluids in contact with the part, and any material family the answer must belong to (for example, "Which aluminium alloy ...").
+
+### 5.2 Command line
+
+```
+python cli.py --prompt "Lining for an incinerator operating at 1200 degrees Celsius" --mode LOCAL_LLM --demand 1500 --verbose
+```
+
+The `--mode` option accepts `LOCAL_LLM`, `CLOUD_API` and `AUTONOMOUS_EXPERT` (deterministic, no language model).
 
 ---
 
-## 5. Running the System
+## 6. Validation
 
-### Web Interface (Streamlit)
-To launch the interactive graphical workbench:
-```bash
-streamlit run app.py
-```
-Open your browser and navigate to `http://localhost:8501`.
+The test suite is run with `python -m unittest discover -s tests`. It covers the following.
 
-The workbench provides:
-- Engineering scenario selection and custom prompt input.
-- Interactive Ashby logarithmic selection charts ($E$ vs. $\rho$, $\sigma_y$ vs. $\rho$).
-- Landed cost waterfall breakdown ($C_{\text{EXW}} \to C_{\text{CIF}} \to C_{\text{DDP}}$).
-- Kraljic matrix supply risk quadrant visualization.
-- Downloadable technical selection dossier in Markdown format.
+- Agreement of the Ashby indices with their reference formulas to a relative tolerance of 10⁻⁵ (`test_ashby_tolerance.py`).
+- Sensitivity of the TOPSIS ranking to perturbations of the criterion weights (`test_topsis_sensitivity.py`).
+- Language understanding, family restriction, chemical compatibility, costing and catalogue consistency (`test_language_understanding.py`), using a simulated Ollama service.
+- A benchmark of 100 engineering scenarios executed through the application pipeline, recording completion and latency (`test_100_benchmarks.py`).
 
-### Command-Line Interface (CLI)
-To run a query directly in headless mode:
-```bash
-python cli.py --prompt "Submarine front transparent shield requiring high hydrostatic yield strength, optical transmission >85%, and saline corrosion resistance."
-```
+`python scripts/run_benchmark_full_pipeline.py` writes `benchmark_100_full_pipeline.csv`, listing the interpretation and the three highest-ranked materials for each scenario, with blank columns in which a reviewer records the expected index and whether the result is correct. The benchmark demonstrates that the pipeline completes and measures its latency; correctness of the selections is established by this expert review.
 
 ---
 
-## 6. Workbench User Manual & Exploration Guide
+## 7. Limitations
 
-The EMS-OS workbench is designed to be **fully open-ended**. While pre-configured benchmark examples are provided in the drop-down menu for convenience, you are encouraged to enter **any custom mechanical engineering design brief** into the console.
-
-### 6.1 Formulating an Open-Ended Technical Prompt
-
-For the natural language translation layer to extract accurate boundary conditions and continuum mechanics parameters, formulate your brief including one or more of the following aspects:
-
-1. **Component Type & Function:** What part is being engineered?
-   - *Examples:* Cantilever beam, pressure vessel, high-speed spindle, drone arm, connecting rod, heat exchanger, turbine blade, gear, spring, or prosthetic implant.
-2. **Primary Loading Mode / Stress State:** What physical forces act on the part?
-   - *Tension / Tie:* Axial stretching, burst hoop stress in thin cylinders ($M = \sigma_y / \rho$ or $M = E / \rho$).
-   - *Bending:* Cantilever or supported beam deflection ($M = E^{1/2} / \rho$) or plastic collapse ($M = \sigma_y^{2/3} / \rho$).
-   - *Plate Out-of-Plane Bending:* Panels, bulkheads, car body panels ($M = E^{1/3} / \rho$ or $M = \sigma_y^{1/2} / \rho$).
-   - *Torsion:* Shafts, couplings, drill strings ($M = G^{1/2} / \rho$).
-   - *Elastic Energy Storage:* Helical or leaf springs ($M = \sigma_y^2 / (E \rho)$).
-   - *Thermal Conduction:* Heat sinks, cooling fins ($M = \lambda / \rho$).
-3. **Environmental & Thermal Constraints:** Where does the part operate?
-   - Temperature ranges (e.g. *cryogenic -196 °C, ambient, or high temperatures > 400 °C*).
-   - Fluid exposure (e.g. *submerged in river sediment, marine saline water, industrial cutting fluids, acids, or vacuum*).
-4. **Manufacturing Process:**
-   - Universal search across all 1,490 materials (metals, polymers, composites, ceramics) or restricted to *FDM Additive Manufacturing* filaments or *CNC Machining*.
-5. **Governing Standards (Optional):**
-   - E.g. *ASTM E466, ASTM A36, ISO 527, ASME Section VIII*.
-
-### 6.2 Navigating the User Interface
-
-The workbench interface is split into two primary panels:
-
-#### Left Panel: Design Specification & Boundary Sizing
-- **In-App User Manual (Collapsible):** Click to review operating instructions directly within the UI.
-- **Standard Benchmark Library:** An optional drop-down containing calibrated engineering baselines. Selecting any preset automatically loads its brief into the text box. Choosing *Custom Specification (Blank)* clears the input for fresh entries.
-- **Technical Engineering Design Brief:** An open-ended multi-line input where you type or edit your mechanical requirements.
-- **Manufacturing Route:**
-  - *Universal Multi-Process:* Evaluates all material families (structural steels, titanium, aluminum alloys, engineering polymers, continuous and short-fiber composites, and technical ceramics).
-  - *FDM Additive Only:* Restricts candidate search to 3D printable filament grades (PETG-CF, PEEK, ASA, PLA, PA12-CF, TPU).
-- **Annual Production Demand (kg):** Enter the estimated annual project consumption (e.g., 500 kg, 2,500 kg, 10,000 kg). The engine uses this to calculate Wilson-Harris Economic Order Quantities (EOQ) and evaluate supplier Minimum Order Quantity (MOQ) holding penalties.
-- **Operational Environmental Kinetics:** Checkboxes to quickly flag specific service hazards (Submerged Hydrolysis, Cryogenic Thermal, Outdoor UV, High-Temp Flash, Vacuum Outgassing).
-- **Inference Route (Sidebar):** Select between:
-  - *Local Standalone LLM (llama3.2 via Ollama):* Local generative synthesis with verified ground-truth bounds.
-  - *Deterministic Continuum Mechanics Solver [Fast < 0.2s]:* Pure mathematical physics and metallurgical evaluation with zero network latency.
-  - *Cloud API (Google Gemini):* Cloud reasoning mode.
-- **Execute Button:** Click **"Execute Screening & Optimization"** to launch the analysis.
-
-#### Right Panel: Multi-Objective Analysis & Sizing
-Once executed, the right panel displays the engineering analysis:
-- **Governing Material Banner:** Highlights the #1 optimal material, its material family, governing Ashby index, and key mechanical constants (yield strength $\sigma_y$, Young's modulus $E$, density $\rho$).
-- **Interactive Log-Log Ashby Chart:** Generates an interactive Plotly property space chart ($E$ vs. $\rho$, $\sigma_y$ vs. $\rho$, or thermal conductivity vs. density) plotting the material universe with the theoretical Ashby selection guide line. Hover over any bubble to inspect mechanical properties.
-- **Incoterms 2020 Sourcing & Landed Cost Breakdown:** A multi-column procurement table displaying Ex Works (EXW) price, Delivered Duty Paid (DDP) cost to Nairobi via Kilindini Harbour (Mombasa), customs tariffs (EAC CET), freight lead times, buffer safety stock, and Kraljic risk quadrant (*Strategic, Bottleneck, Leverage, Routine*).
-- **Technical Dossier:** Displays detailed metallurgical commentary on microstructural trade-offs, operational failure modes (fatigue, creep, galvanic corrosion), and recommended fabrication directives.
-- **Export Report:** Download the verified selection dossier as a clean Markdown report for your design log.
-
-#### Sidebar Utilities
-- **Design Cases Manager:** Create new design cases with **"+ New Design Case"** or switch between previous cases. Each case preserves its own independent prompt, inputs, and results.
-- **Material Database Inspector:** Select any material from the 1,490-grade database to inspect its standardized mechanical properties, thermal limits, and raw cost.
-
-### 6.3 Sample Open-Ended Prompts to Try
-
-Copy and paste any of the following open-ended technical briefs into the text area to test different physics engines:
-
-```text
-1. Drone Arm (Aerospace / Flexural Stiffness):
-"Design a lightweight cantilever arm for an autonomous agricultural drone carrying a 5 kg sensor payload under high wind gusts. Must maximize flexural bending stiffness per unit mass while resisting outdoor solar UV radiation."
-
-2. Geothermal Valve Body (High-Temperature & Corrosive Media):
-"Valving body for an Olkaria geothermal brine extraction line operating at 320 C and 40 bar pressure. Must resist hot saline sulfide stress corrosion cracking, prevent catastrophic thermal creep rupture, and conform to ASME Section VIII."
-
-3. Marine Propeller Hub (Hydrodynamic Cavitation & Saline Immersion):
-"High-speed marine vessel propeller hub operating continuously in coastal seawater under cyclic torsional shear stress at 2,800 RPM. Requires high shear modulus G > 40 GPa, immunity to pitting corrosion, and low galvanic potential."
-
-4. Precision Optical Mirror Bulkhead (Dimensional Stability):
-"Support bulkhead for a high-precision satellite optical camera. Requires near-zero thermal expansion coefficient, maximum specific stiffness E/rho to survive launch acoustic vibration, and zero outgassing in vacuum."
-
-5. Heavy-Duty Truck Suspension Leaf Spring (Elastic Strain Energy):
-"Heavy commercial transport vehicle suspension spring operating over rough gravel roads. Maximize elastic strain energy storage per unit mass (sigma_y^2 / (E * rho)) while maintaining high fracture toughness and resistance to cyclic fatigue."
-```
+- The language model is small (1 billion parameters). Its output is validated, but unusual briefs may still be misread; the decision provenance panel shows when the rule-based parser was used instead.
+- Selection is governed by the Ashby index of the identified load case together with hard gating rules. Properties such as corrosion behaviour, wear and joining are modelled only where an explicit rule exists.
+- Prices, lead times and availability are catalogue estimates and should be confirmed with suppliers before procurement.
+- Whether the Kenyan VAT base on imports includes the Import Declaration Fee and Railway Development Levy should be confirmed against current Kenya Revenue Authority guidance.
 
 ---
 
-## 7. Citation
+## 8. Citation
 
 If referencing this project, please cite our technical report using the following IEEE format:
 
