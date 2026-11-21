@@ -51,6 +51,7 @@ st.set_page_config(
 st.markdown("""
 <style>
     :root {
+        color-scheme: light;
         --canvas: #f4f5f7;
         --surface-1: #ffffff;
         --surface-2: #f8f9fb;
@@ -355,10 +356,32 @@ st.markdown("""
     .ems-table { border-collapse: collapse; width: 100%; font-size: 12px; }
     .ems-table th, .ems-table td { border: 1px solid var(--hairline); padding: 6px 10px; text-align: left; vertical-align: top; color: var(--ink); background: var(--surface-1); }
     .ems-table th { background: var(--surface-3); font-weight: 600; }
-    [data-baseweb="popover"] *, [data-baseweb="menu"] *, [role="listbox"] * { background-color: var(--surface-1); color: var(--ink); }
-    [data-baseweb="select"] * { color: var(--ink); }
-    .stCheckbox label, .stRadio label, .stToggle label, .stNumberInput label, .stSelectbox label { color: var(--ink); }
-    .stNumberInput input { background-color: var(--surface-1); color: var(--ink); }
+    /* Form controls: Streamlit wraps each input in BaseWeb containers that carry their own background, so the containers are themed explicitly. */
+    [data-baseweb="input"], [data-baseweb="base-input"], [data-baseweb="textarea"], [data-baseweb="select"] > div,
+    [data-baseweb="input"] *, [data-baseweb="base-input"] *, [data-baseweb="textarea"] *, [data-baseweb="select"] * {
+        background-color: var(--surface-2) !important;
+        color: var(--ink) !important;
+        border-color: var(--hairline) !important;
+    }
+    [data-baseweb="select"] svg, [data-baseweb="input"] svg { fill: var(--ink-subtle) !important; color: var(--ink-subtle) !important; }
+    ::placeholder { color: var(--ink-tertiary) !important; opacity: 1 !important; }
+    /* Drop-down lists and pop-overs */
+    [data-baseweb="popover"], [data-baseweb="popover"] > div, [data-baseweb="menu"], ul[role="listbox"], div[role="listbox"],
+    [data-baseweb="popover"] ul, [data-baseweb="popover"] li {
+        background-color: var(--surface-1) !important;
+        color: var(--ink) !important;
+        border-color: var(--hairline) !important;
+    }
+    li[role="option"], [data-baseweb="menu"] li, [data-baseweb="popover"] li * { background-color: var(--surface-1) !important; color: var(--ink) !important; }
+    li[role="option"]:hover, li[role="option"][aria-selected="true"], [data-baseweb="menu"] li:hover { background-color: var(--surface-3) !important; }
+    /* Number-input steppers, file uploader, expanders, tabs */
+    [data-testid="stNumberInputStepUp"], [data-testid="stNumberInputStepDown"], [data-testid="stNumberInput"] button {
+        background-color: var(--surface-3) !important; color: var(--ink) !important; border-color: var(--hairline) !important;
+    }
+    [data-testid="stFileUploaderDropzone"] { background-color: var(--surface-2) !important; border-color: var(--hairline) !important; }
+    [data-testid="stExpander"] summary, [data-testid="stExpander"] details { background-color: var(--surface-1) !important; color: var(--ink) !important; }
+    [data-testid="stSidebar"] [data-baseweb="select"] > div { background-color: var(--surface-2) !important; }
+    .stCheckbox label, .stRadio label, .stToggle label, .stNumberInput label, .stSelectbox label, .stTextArea label, .stTextInput label { color: var(--ink) !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -383,8 +406,8 @@ if dark_mode:
         --warning: #d1a24a;
         --danger: #d98585;
     }
-    [data-testid="stHeader"] { background-color: var(--canvas) !important; }
-    textarea, input { color: var(--ink) !important; }
+    :root { color-scheme: dark; }
+    [data-testid="stHeader"], [data-testid="stToolbar"] { background-color: var(--canvas) !important; }
 </style>
 """, unsafe_allow_html=True)
 

@@ -26,7 +26,7 @@ EMS-OS addresses this by separating language understanding from engineering calc
 The pipeline comprises the following stages.
 
 1. **Language understanding.** The local model (`llama3.2:3b`, served by Ollama) extracts the component type, governing load case, service temperature and pressure, environment, chemical media and any restriction to a material family. Output is constrained to a JSON schema and validated; if the model is unavailable the rule-based parser is used and the report states which interpretation was applied.
-2. **Physical gating.** Materials that cannot satisfy hard constraints are removed, including service temperature, cryogenic ductility, optical transparency, non-magnetic service, requested family and chemical compatibility (for example liquid gallium against aluminium and copper).
+2. **Physical gating.** Materials that cannot satisfy hard constraints are removed, including service temperature, cryogenic ductility, optical transparency, non-magnetic service, requested family and chemical compatibility (for example liquid gallium against aluminium and copper). A table of common melts (gold, silver, platinum, copper, brass, bronze, aluminium, zinc, lead, tin, magnesium, glass and steel) records each melting point, the families the melt attacks and the families normally used to handle it; the stated service temperature is checked against the melting point, and a missing temperature is taken as the melting point plus 50 °C.
 3. **Ashby screening.** Analytical Ashby indices are evaluated for the governing load case over the materials catalogue.
 4. **Techno-economic evaluation.** Delivered Duty Paid cost to Nairobi via Mombasa is computed from each material's price, with freight, insurance, EAC customs duty, Import Declaration Fee, Railway Development Levy, VAT, port handling and clearance, together with lead-time safety stock and economic order quantity.
 5. **Multi-criteria ranking.** Candidates are ranked by vector-normalised TOPSIS over performance, landed cost, lead time and supply availability.
@@ -201,6 +201,7 @@ The test suite is run with `python -m unittest discover -s tests`. It covers the
 ## 7. Limitations
 
 - The language model is small (3 billion parameters). Its output is validated and its commentary is restricted to catalogue values, but unusual briefs may still be misread and the commentary must be verified before use; the decision provenance panel shows when the rule-based parser was used instead.
+- The molten-media table is general engineering guidance covering the melts listed above and should be confirmed against supplier and handbook data. The catalogue currently contains four technical ceramics and no graphite, zirconia, silicon nitride or refractory metals, so refractory selections are limited to alumina and silicon carbide until further grades are added.
 - Selection is governed by the Ashby index of the identified load case together with hard gating rules. Properties such as corrosion behaviour, wear and joining are modelled only where an explicit rule exists.
 - Prices, lead times and availability are catalogue estimates and should be confirmed with suppliers before procurement.
 - Whether the Kenyan VAT base on imports includes the Import Declaration Fee and Railway Development Levy should be confirmed against current Kenya Revenue Authority guidance.

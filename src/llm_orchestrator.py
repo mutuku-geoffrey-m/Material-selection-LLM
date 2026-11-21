@@ -346,10 +346,12 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
         # Candidate restriction requested in the brief (for example "which aluminium alloy ...").
         advisories: List[str] = list(engineering_spec.get("advisories") or [])
         requested_family = boundary.get("requested_material_family")
-        if requested_family:
-            label = FAMILY_LABELS.get(requested_family, requested_family)
+        restrict_families = [requested_family] if requested_family else list(boundary.get("melt_preferred_families") or [])
+        if restrict_families:
+            label = " / ".join(FAMILY_LABELS.get(f, f) for f in restrict_families)
+            pool_keys = sorted({k for f in restrict_families for k in family_member_keys(f)})
             restricted = rank_materials(**{**rank_kwargs, "candidate_filter": [],
-                                           "materials": [MATERIALS_DATABASE[k] for k in family_member_keys(requested_family)]})
+                                           "materials": [MATERIALS_DATABASE[k] for k in pool_keys]})
             if requested_family == "aluminium" and marine_service(user_prompt):
                 marine_ready = [m for m in restricted if not is_high_strength_aluminium_series(m)]
                 if marine_ready:
@@ -358,10 +360,16 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
                                       "exfoliation and stress-corrosion cracking in marine service.")
             if restricted and not restricted[0].get("thermally_inviable"):
                 ranked_materials = restricted
-                advisories.append(f"Candidates were restricted to {label} grades as requested in the brief.")
+                reason = "requested in the brief" if requested_family else "normally used with the molten medium"
+                advisories.append(f"Candidates were restricted to {label} grades, which are {reason}.")
             else:
                 advisories.append(f"No {label} grade in the catalogue satisfies the stated service conditions, so the "
-                                  f"unrestricted ranking is shown. The {label} family is not recommended for this brief.")
+                                  f"unrestricted ranking is shown and should be treated as indicative only."
+                                  + (f" The {label} family is not recommended for this brief." if requested_family else ""))
+
+        # Catalogue records that share a grade name (duplicates from different sources) are listed once.
+        seen_names = set()
+        ranked_materials = [m for m in ranked_materials if not (m["name"] in seen_names or seen_names.add(m["name"]))]
 
         if ranked_materials and ranked_materials[0].get("thermally_inviable"):
             advisories.append("No catalogue material has a continuous service limit at or above the stated temperature. The "

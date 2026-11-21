@@ -8,7 +8,8 @@ from typing import Dict, Any, List, Optional
 import os
 import re
 from src.text_matching import as_keyword_text
-from src.compatibility import detect_requested_family, media_exclusions, galvanic_advisory
+from src.compatibility import (MELTS, detect_melt, detect_requested_family, galvanic_advisory, is_stirring_duty,
+                               media_exclusions, melt_assumptions)
 from src.ashby_engine import AshbyIndex, derive_selection_guide
 
 _ML_INTENT_MODEL = None
@@ -67,6 +68,27 @@ class NLPTranslationLayer:
         family = boundary.get("requested_material_family") or detect_requested_family(prompt)
         excluded, notes = media_exclusions(prompt, boundary.get("chemical_media", []))
         advisories = list(notes)
+        melt = detect_melt(prompt)
+        boundary["melt"] = melt
+        boundary["melt_preferred_families"] = []
+        if melt:
+            numerical = spec.setdefault("numerical_parameters", {})
+            if "melt_notes" not in boundary:
+                temperature, melt_notes = melt_assumptions(melt, numerical.get("target_service_temperature_c"))
+                numerical["target_service_temperature_c"] = temperature
+                boundary["melt_notes"] = melt_notes
+            advisories.extend(boundary["melt_notes"])
+            for fam in MELTS[melt]["unsuitable"]:
+                if fam not in excluded:
+                    excluded.append(fam)
+            boundary["melt_preferred_families"] = list(MELTS[melt]["preferred"])
+            if is_stirring_duty(prompt):
+                synth = spec["synthesized_engineering_spec"]
+                synth["primary_governing_ashby_index"] = "beam_strength"
+                synth["ashby_mathematical_formula"] = "σ_y^(2/3) / ρ"
+                synth["ashby_selection_rationale"] = ("Stirrer immersed in a melt: the shaft or blade is loaded in bending at the bath temperature, "
+                                                      "so material is screened for service temperature and resistance to the melt, then ranked "
+                                                      "by M = σ_y^(2/3) / ρ.")
         galvanic = galvanic_advisory(prompt, family)
         if galvanic:
             advisories.append(galvanic)

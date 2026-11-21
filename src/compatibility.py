@@ -149,3 +149,86 @@ def service_limit_c(record: Dict) -> float:
         if _in_family(record, family):
             return limit
     return float(record.get("heat_deflection_temp") or 350.0)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Molten media: melting point, families that are attacked, and families normally used for handling the melt.
+# Entries are general engineering guidance and should be confirmed against supplier and handbook data.
+# ---------------------------------------------------------------------------------------------------------------------
+_REACTIVE_WITH_NOBLE_MELTS = ("aluminium", "magnesium", "copper", "nickel_alloy", "titanium", "polymer", "composite")
+MELTS: Dict[str, Dict] = {
+    "gold": {"mp": 1064.0, "unsuitable": _REACTIVE_WITH_NOBLE_MELTS, "preferred": ("ceramic",),
+             "note": "Molten gold alloys with nickel, copper, aluminium and magnesium; refractory ceramics are the usual choice for stirrers and vessels."},
+    "silver": {"mp": 962.0, "unsuitable": _REACTIVE_WITH_NOBLE_MELTS, "preferred": ("ceramic",),
+               "note": "Molten silver dissolves oxygen and alloys with copper and nickel; refractory ceramics are the usual choice."},
+    "platinum": {"mp": 1768.0, "unsuitable": _REACTIVE_WITH_NOBLE_MELTS + ("steel", "stainless_steel", "cast_iron"), "preferred": ("ceramic",),
+                 "note": "Molten platinum exceeds the service limit of all common metals; only refractory ceramics are suitable."},
+    "copper": {"mp": 1085.0, "unsuitable": ("aluminium", "magnesium", "copper", "polymer", "composite"), "preferred": ("ceramic",),
+               "note": "Molten copper attacks aluminium and magnesium and oxidises uncoated ferrous parts; refractory ceramics are preferred."},
+    "brass": {"mp": 930.0, "unsuitable": ("aluminium", "magnesium", "polymer", "composite"), "preferred": ("ceramic",),
+              "note": "Molten brass loses zinc by volatilisation and attacks aluminium and magnesium; refractory ceramics are preferred."},
+    "bronze": {"mp": 950.0, "unsuitable": ("aluminium", "magnesium", "polymer", "composite"), "preferred": ("ceramic",),
+               "note": "Molten bronze attacks aluminium and magnesium; refractory ceramics are preferred."},
+    "aluminium": {"mp": 660.0, "unsuitable": ("aluminium", "copper", "magnesium", "nickel_alloy", "steel", "stainless_steel",
+                                              "titanium", "cast_iron", "polymer", "composite"), "preferred": ("ceramic",),
+                  "note": "Molten aluminium dissolves iron, nickel and copper and wets most metals; non-wetting refractory ceramics are preferred."},
+    "zinc": {"mp": 420.0, "unsuitable": ("aluminium", "copper", "magnesium", "polymer", "composite"),
+             "preferred": ("steel", "stainless_steel", "cast_iron", "ceramic"),
+             "note": "Molten zinc attacks aluminium and copper alloys; low-carbon steel, cast iron, stainless steel and ceramics are used."},
+    "lead": {"mp": 327.0, "unsuitable": ("aluminium", "copper", "magnesium", "polymer", "composite"),
+             "preferred": ("steel", "stainless_steel", "cast_iron", "ceramic"),
+             "note": "Molten lead attacks aluminium, copper and magnesium; steels, cast iron and ceramics are used."},
+    "tin": {"mp": 232.0, "unsuitable": ("aluminium", "copper", "magnesium", "polymer", "composite"),
+            "preferred": ("stainless_steel", "steel", "cast_iron", "ceramic"),
+            "note": "Molten tin alloys with copper and attacks aluminium; stainless steel, steel, cast iron and ceramics are used."},
+    "magnesium": {"mp": 650.0, "unsuitable": ("aluminium", "copper", "nickel_alloy", "titanium", "polymer", "composite"),
+                  "preferred": ("steel", "cast_iron", "ceramic"),
+                  "note": "Molten magnesium attacks aluminium, copper, nickel and titanium; low-carbon steel and ceramics are used."},
+    "glass": {"mp": 1400.0, "unsuitable": ("aluminium", "magnesium", "copper", "steel", "stainless_steel", "cast_iron", "titanium",
+                                           "polymer", "composite"), "preferred": ("ceramic",),
+              "note": "Molten glass attacks and oxidises most metals at working temperature; refractory ceramics are preferred."},
+    "steel": {"mp": 1538.0, "unsuitable": ("aluminium", "magnesium", "copper", "nickel_alloy", "steel", "stainless_steel", "cast_iron",
+                                           "titanium", "polymer", "composite"), "preferred": ("ceramic",),
+              "note": "Molten steel exceeds the service limit of all common metals; only refractory ceramics are suitable."},
+}
+_MELT_NAMES = {"gold": "gold", "silver": "silver", "platinum": "platinum", "copper": "copper", "brass": "brass", "bronze": "bronze",
+               "aluminium": "aluminium", "aluminum": "aluminium", "zinc": "zinc", "lead": "lead", "tin": "tin",
+               "magnesium": "magnesium", "glass": "glass", "steel": "steel", "iron": "steel"}
+_MELT_WORDS = "|".join(sorted(_MELT_NAMES, key=len, reverse=True))
+_STIRRER_WORDS = ("stir", "agitat", "propeller", "impeller", "paddle", "rake", "mixer", "mixing rod", "stirrer", "rabble")
+
+
+def detect_melt(prompt: str) -> Optional[str]:
+    """Return the melt named in the brief (for example "gold" in "propeller to stir molten gold"), else None."""
+    text = (prompt or "").lower()
+    patterns = (
+        rf"\b(?:molten|liquid|melted|melting|melt of|bath of|pool of)\s+(?:\w+\s+){{0,2}}?({_MELT_WORDS})\b",
+        rf"\b({_MELT_WORDS})\s+(?:melt|melts|bath|baths|melting|crucible|furnace|foundry)\b",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return _MELT_NAMES[match.group(1)]
+    return None
+
+
+def is_stirring_duty(prompt: str) -> bool:
+    text = (prompt or "").lower()
+    return any(w in text for w in _STIRRER_WORDS)
+
+
+def melt_assumptions(melt: str, stated_temperature_c: Optional[float]) -> Tuple[Optional[float], List[str]]:
+    """Return the service temperature to use and explanatory notes, checking the stated value against the melting point."""
+    info = MELTS[melt]
+    mp = info["mp"]
+    notes = [info["note"]]
+    if stated_temperature_c is None:
+        temperature = mp + 50.0
+        notes.append(f"No temperature was stated; the bath was assumed to be {temperature:g} °C (melting point of {melt}, {mp:g} °C, plus 50 °C superheat).")
+    elif stated_temperature_c < mp - 5.0:
+        temperature = mp
+        notes.append(f"The stated temperature ({stated_temperature_c:g} °C) is below the melting point of {melt} ({mp:g} °C), so the {melt} would be solid. "
+                     f"The analysis assumes a molten bath at {mp:g} °C; state a temperature above {mp:g} °C if a hotter melt is intended.")
+    else:
+        temperature = stated_temperature_c
+    return temperature, notes
