@@ -8,7 +8,7 @@ import os
 import re
 from src.text_matching import as_keyword_text
 from src.materials_db import MATERIALS_DATABASE
-from src.compatibility import (FAMILY_LABELS, service_limit_c, belongs_to_family, family_member_keys,
+from src.compatibility import (FAMILY_LABELS, commentary_contradicts_directive, load_modes, fails_safety_critical_screen, process_note, safety_critical_duty, service_limit_c, belongs_to_family, family_member_keys,
                                is_high_strength_aluminium_series, marine_service)
 import json
 import time
@@ -367,6 +367,17 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
                                   f"unrestricted ranking is shown and should be treated as indicative only."
                                   + (f" The {label} family is not recommended for this brief." if requested_family else ""))
 
+        # Safety-critical load paths: ductile failure and freedom from stress-corrosion cracking are required of metals.
+        if safety_critical_duty(user_prompt):
+            screened = [m for m in ranked_materials if not fails_safety_critical_screen(m)]
+            if screened and len(screened) < len(ranked_materials):
+                ranked_materials = screened
+                advisories.append("Safety-critical duty: cast grades, metals with less than 200 MPa yield strength or 8 % elongation, "
+                                  "and 2xxx or 7xxx aluminium in the stress-corrosion-susceptible T6 tempers were excluded.")
+            # Stiffness indices do not depend on alloy strength, so grades with equal index values are ordered by yield strength.
+            ranked_materials.sort(key=lambda m: (-round(float(m.get("index_value", m.get("final_metric", 0.0))), 2),
+                                                 -float(MATERIALS_DATABASE.get(m.get("key"), {}).get("yield_strength") or 0.0)))
+
         # Catalogue records that share a grade name (duplicates from different sources) are listed once.
         seen_names = set()
         ranked_materials = [m for m in ranked_materials if not (m["name"] in seen_names or seen_names.add(m["name"]))]
@@ -496,8 +507,10 @@ You MUST recommend {top_mat.get('name')} as the primary winning material in your
             conditions.append("submerged water service")
         conditions.extend(f"contact with {m}" for m in boundary_for_prompt.get("chemical_media", []))
 
-        route_instruction = ("not restricted; recommend one conventional route suited to this material"
-                             if "universal" in str(mfg_process_label).lower() else str(mfg_process_label))
+        route_instruction = (process_note(top_record) if "universal" in str(mfg_process_label).lower()
+                             else str(mfg_process_label))
+        if "ceramic" in str(top_record.get("family", "")).lower():
+            route_instruction += " (sintered ceramics are finished by diamond grinding only; do not suggest milling, turning or drilling)"
         focused_llm_prompt = f"""You are a materials engineer writing short commentary for a design report.
 Design brief: {user_prompt}
 Component class: {comp_class}
@@ -513,6 +526,51 @@ Rules:
 - Discuss only the failure modes that the stated conditions make relevant; do not mention conditions that are absent from the brief.
 - Keep fabrication advice consistent with the manufacturing route stated above.
 Write three short paragraphs headed "Material rationale", "Principal failure risks" and "Fabrication and quality control". Use at most 170 words in total."""
+
+        modes = load_modes(user_prompt)
+        if len(modes) > 1:
+            advisories.append(f"Several load cases are stated ({', '.join(modes)}). The ranking uses the single governing index "
+                              f"'{ashby_key}'; the remaining load cases should be checked in detailed design.")
+
+        # Requirement check: compare the stated cost, delivery and quantity limits with the evaluated candidates.
+        requirements = boundary.get("requirements") or {}
+        if techno_economic_leaderboard:
+            costs = [e["economics"].get("landed_cost_usd_per_kg", 0.0) for e in techno_economic_leaderboard]
+            leads = [e["economics"].get("lead_time_days", 0.0) for e in techno_economic_leaderboard]
+            first = techno_economic_leaderboard[0]["economics"]
+            cost_cap, lead_cap, batch_kg = (requirements.get("max_cost_usd_kg"), requirements.get("max_lead_days"),
+                                            requirements.get("batch_kg"))
+            if cost_cap is not None:
+                if min(costs) > cost_cap:
+                    advisories.append(f"Cost limit not met: no candidate has a delivered cost at or below ${cost_cap:g}/kg "
+                                      f"(lowest listed: ${min(costs):.2f}/kg). Relax the limit or accept a lower-performing family.")
+                elif first.get("landed_cost_usd_per_kg", 0.0) > cost_cap:
+                    advisories.append(f"The first-ranked candidate (${first['landed_cost_usd_per_kg']:.2f}/kg delivered) exceeds the stated "
+                                      f"limit of ${cost_cap:g}/kg; candidates within the limit are ranked lower.")
+            if lead_cap is not None:
+                if min(leads) > lead_cap:
+                    advisories.append(f"Delivery limit not met: the shortest modelled lead time is {min(leads):g} days against the stated "
+                                      f"{lead_cap:g} days. Delivery is modelled to Nairobi via Mombasa; inland transfer is not included.")
+                elif first.get("lead_time_days", 0.0) > lead_cap:
+                    advisories.append(f"The first-ranked candidate has a modelled lead time of {first['lead_time_days']:g} days, "
+                                      f"above the stated {lead_cap:g} days.")
+            if batch_kg is not None:
+                if abs(batch_kg - annual_demand_kg) > 0.5:
+                    advisories.append(f"The brief states a quantity of {batch_kg:g} kg, but the sourcing analysis uses the demand field "
+                                      f"({annual_demand_kg:g} kg); adjust the field if the brief is correct.")
+                moq = first.get("minimum_order_quantity_kg")
+                if moq and batch_kg < moq:
+                    advisories.append(f"The minimum order quantity of the first-ranked candidate ({moq:g} kg) exceeds the stated "
+                                      f"{batch_kg:g} kg, so the order would carry surplus stock.")
+        if ranked_materials:
+            lead_record = MATERIALS_DATABASE.get(ranked_materials[0].get("key"), {})
+            if "ceramic" in str(lead_record.get("family", "")).lower():
+                advisories.append("Ceramics fail by brittle fracture rather than by yielding: the strength listed is a rupture strength, "
+                                  "and a Weibull-based design margin and a fracture-toughness check are required.")
+                if boundary.get("melt") or (engineering_spec.get("numerical_parameters", {}).get("target_service_temperature_c") or 0) > 300:
+                    advisories.append("Ceramic parts are sensitive to thermal shock: preheat slowly and immerse gradually. Silicon nitride "
+                                      "or SiAlON grades, which are not in the catalogue, generally tolerate larger temperature gradients "
+                                      "than alumina.")
 
         expert_report = self._autonomous_expert_synthesis(
             user_prompt=user_prompt,
@@ -537,6 +595,9 @@ Write three short paragraphs headed "Material rationale", "Principal failure ris
                 active_engine = "Autonomous Expert Reasoning Engine (Deterministic Verification)"
         else:
             local_output = self._call_local_llm(focused_llm_prompt)
+            if local_output and commentary_contradicts_directive(local_output, top_record):
+                local_output = None
+                self.last_llm_error = "commentary recommended conventional machining of a sintered ceramic and was withheld"
             if local_output:
                 generation_text = f"{expert_report}\n\n### 9. Generated Commentary (Local Language Model; verify before use)\n{local_output}"
                 active_engine = f"Local Standalone LLM ({self.local_model} via Ollama)"
@@ -607,6 +668,7 @@ Write three short paragraphs headed "Material rationale", "Principal failure ris
 """ + "\n".join(table_rows) + f"""
 
 **Supply Chain Sourcing Analysis:**
+- **Highest technical performance:** `{ranked_materials[0]['name']}` has the best Ashby index among the screened candidates; the TOPSIS ranking below also weights landed cost, lead time and supply risk, so its first-ranked grade can differ.
 - **Rank 1 Optimal Trade-Off:** `{techno_economic_leaderboard[0]['name']}` achieved the highest overall TOPSIS composite score ({techno_economic_leaderboard[0]['composite_score']:.1f}/100) balancing continuum mechanics performance against procurement lead times, tariffs, and carrying costs.
 - **Incoterms 2020 Total Landed Cost (TLC):** Evaluates mill price $C_{{EXW}}$, international ocean/air freight, marine insurance (0.40% on 110% of FOB + freight), Kenyan customs tariffs (EAC CET 0% to 25%, IDF 2.5%, RDL 2.0%, VAT 16.0%), port handling at Mombasa Port (\\$0.08/kg), and SGR inland freight to Nairobi (\\$0.10/kg).
 - **Stochastic Lead Time & Safety Stock ($SS$):** Formulated via Silver, Pyke & Peterson (1998): $SS = z_{{\\alpha}} \\sqrt{{\\mu_L \\sigma_D^2 + D^2 \\sigma_L^2}}$ at 95% service level ($z = 1.645$) to guarantee zero plant stockouts despite maritime transit volatility.
@@ -766,7 +828,7 @@ Write three short paragraphs headed "Material rationale", "Principal failure ris
             mfg_note = (
                 f"{'Requires hardened steel/ruby nozzle' if fdm_info.get('abrasive_nozzle_required') else 'Standard brass nozzle'}; Bed {fdm_info.get('bed_temperature_min')}-{fdm_info.get('bed_temperature_max')}°C"
                 if fdm_info.get("ease_of_printing") != "Not FDM Printable"
-                else "CNC Machining / Foundry Casting"
+                else process_note(mat_obj)
             )
             table_rows.append(
                 f"| **{m['name']}** | {mat_obj['yield_strength']} - {mat_obj['ultimate_tensile_strength']} MPa | "
@@ -775,7 +837,7 @@ Write three short paragraphs headed "Material rationale", "Principal failure ris
                 f"{mfg_note} |"
             )
         is_subtractive = "subtractive" in mfg_process.lower() or "cnc" in mfg_process.lower()
-        is_fdm_process = "fdm" in mfg_process.lower() or "additive" in mfg_process.lower()
+        is_fdm_process = ("fdm" in mfg_process.lower() or "additive" in mfg_process.lower()) and "universal" not in mfg_process.lower()
         constraint_term = "additive manufacturing constraints" if is_fdm_process else ("subtractive (CNC) machining constraints" if is_subtractive else "cross-domain manufacturing feasibility constraints")
         col_header = "Additive Manufacturing Constraints" if is_fdm_process else "Manufacturing & Processing Directives"
 
@@ -797,7 +859,7 @@ Write three short paragraphs headed "Material rationale", "Principal failure ris
         # Thermal discussion if high temperature
         if temp_c is not None and temp_c > 140.0:
             response_lines.append(
-                f"- **Thermal Service Threshold Warning ({temp_c}°C):** All standard thermoplastics (PLA, PETG, ABS, ASA, Nylon PA12) suffer irreversible thermal deformation at this temperature, as their heat deflection temperatures (HDT: 52°C to 140°C) are exceeded. Consequently, the system selects **{top_mat['name']}**, which provides continuous thermal stability up to its operating threshold."
+                f"- **Thermal Service Threshold ({temp_c}°C):** Standard thermoplastics (PLA, PETG, ABS, ASA, Nylon PA12) are excluded because their heat deflection temperatures (HDT: 52°C to 140°C) are exceeded. **{top_mat['name']}** is retained with a continuous service limit of {service_limit_c(MATERIALS_DATABASE.get(top_mat.get('key'), {})):g} °C."
             )
 
         # Domain-Specific Engineering Analysis (Evaluated by Specific Functional Class First)

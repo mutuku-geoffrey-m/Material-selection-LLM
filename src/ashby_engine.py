@@ -31,6 +31,7 @@ class AshbyIndex:
     THERMAL_DIFFUSIVITY = "thermal_diffusivity" # a = lambda / (rho * Cp) (Heat dissipation)
     THERMAL_CONDUCTIVITY = "thermal_conductivity" # M = lambda (Steady-state heat conduction / heat sinks)
     THERMAL_INSULATION = "thermal_insulation"     # M = 1 / lambda (Thermal barriers)
+    COLUMN_BUCKLING = "column_buckling"           # M = E^(1/2) / rho (Slender compression members, Euler buckling)
     SHAFT_TORSION = "shaft_torsion"               # M7 = G^(1/2) / rho (Torsional shaft stiffness)
     COST_NORMALIZED_TIE = "cost_normalized_tie"   # M9 = sigma_y / (rho * C_m) (Cost-normalized tensile tie)
     FATIGUE_EFFICIENCY = "fatigue_efficiency"   # M = sigma_fatigue / rho (Cyclic loading)
@@ -108,6 +109,12 @@ INDEX_DESCRIPTIONS = {
         "name": "Thermal Insulation Resistance",
         "formula": "1 / λ",
         "primary_application": "Thermal barrier coatings, furnace insulations, cryogenic insulation",
+        "maximize": True
+    },
+    AshbyIndex.COLUMN_BUCKLING: {
+        "name": "Slender Column in Compression (Euler Buckling)",
+        "formula": "E^(1/2) / ρ",
+        "primary_application": "Pin-jointed struts, push-rods, wishbone members and support columns loaded axially",
         "maximize": True
     },
     AshbyIndex.SHAFT_TORSION: {
@@ -209,6 +216,10 @@ def calculate_ashby_index(material: Dict[str, Any], index_key: str, use_printed_
 
     elif index_key == AshbyIndex.FATIGUE_EFFICIENCY:
         return sigma_fatigue_mpa / (rho / 1000.0)
+
+    elif index_key == AshbyIndex.COLUMN_BUCKLING:
+        # Euler buckling of a slender column of fixed length and load: minimum mass for maximum E^(1/2) / rho
+        return math.sqrt(E_gpa) / (rho / 1000.0)
 
     elif index_key == AshbyIndex.SHAFT_TORSION:
         # M7 = G^(1/2) / (rho/1000), G in GPa. Falls back to E / (2(1+nu)) when G is not tabulated.

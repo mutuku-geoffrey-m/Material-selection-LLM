@@ -41,9 +41,9 @@ SCHEMA: Dict[str, Any] = {
     "properties": {
         "component_class": {"type": "string", "enum": COMPONENT_CLASSES},
         "governing_index": {"type": "string", "enum": INDEX_VALUES},
-        "service_temperature_c": {"type": ["number", "null"]},
-        "pressure_atm": {"type": ["number", "null"]},
-        "requested_material_family": {"type": ["string", "null"], "enum": FAMILY_VALUES + [None]},
+        "service_temperature_c": {"type": "number"},
+        "pressure_atm": {"type": "number"},
+        "requested_material_family": {"type": "string", "enum": FAMILY_VALUES + ["none"]},
         "environment": {"type": "array", "items": {"type": "string", "enum": ENVIRONMENT_VALUES}},
         "chemical_media": {"type": "array", "items": {"type": "string"}},
         "rationale": {"type": "string"},
@@ -53,17 +53,17 @@ SCHEMA: Dict[str, Any] = {
 }
 
 _INSTRUCTIONS = """You extract engineering requirements from a design brief. Reply with one JSON object only.
-Fields: component_class, governing_index, service_temperature_c (highest continuous temperature in degrees Celsius, or null),
-pressure_atm (or null), requested_material_family (only when the brief asks which grade or alloy of a named material family, else null),
+Fields: component_class, governing_index, service_temperature_c (highest continuous temperature in degrees Celsius, or -999 if not stated),
+pressure_atm (or -999 if not stated), requested_material_family (only when the brief asks which grade or alloy of a named material family, else \"none\"),
 environment (list), chemical_media (fluids that touch the part), rationale (one short sentence).
 governing_index: beam_stiffness = lightest part limited by bending deflection; beam_strength = limited by bending failure;
 plate_stiffness / plate_strength = panels and shells; tie_strength / tie_stiffness = tensile members; shaft_torsion = twisting shafts;
 flywheel_inertia = rotating parts limited by centrifugal burst; elastic_energy = springs and snap fits; thermal_conductivity = heat exchangers
 and heat sinks; thermal_insulation = linings and insulation; fatigue_efficiency = cyclic loading; cost_normalized_tie = cheapest tension member.
 Example brief: "Heat exchanger tube carrying seawater at 90 C".
-Example answer: {"component_class":"thermal_management_heat_sink","governing_index":"thermal_conductivity","service_temperature_c":90,"pressure_atm":null,"requested_material_family":null,"environment":["marine_saltwater"],"chemical_media":["seawater"],"rationale":"Heat transfer through a tube wall in a saline fluid."}
+Example answer: {"component_class":"thermal_management_heat_sink","governing_index":"thermal_conductivity","service_temperature_c":90,"pressure_atm":-999,"requested_material_family":"none","environment":["marine_saltwater"],"chemical_media":["seawater"],"rationale":"Heat transfer through a tube wall in a saline fluid."}
 Example brief: "Which steel grade for a 40 mm drive shaft transmitting 500 Nm?"
-Example answer: {"component_class":"rotational_drive_element","governing_index":"shaft_torsion","service_temperature_c":null,"pressure_atm":null,"requested_material_family":"steel","environment":[],"chemical_media":[],"rationale":"A shaft limited by torsional stiffness, restricted to steel grades."}
+Example answer: {"component_class":"rotational_drive_element","governing_index":"shaft_torsion","service_temperature_c":-999,"pressure_atm":-999,"requested_material_family":"steel","environment":[],"chemical_media":[],"rationale":"A shaft limited by torsional stiffness, restricted to steel grades."}
 """
 
 
@@ -142,19 +142,27 @@ def extract_hints(prompt: str, base_url: Optional[str] = None, model: Optional[s
         "options": {"temperature": 0, "num_predict": 220, "num_ctx": 2048, "num_thread": 4},
     }
     started = time.time()
-    try:
-        request = urllib.request.Request(base_url + "/api/generate", data=json.dumps(payload).encode("utf-8"),
-                                         headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(request, timeout=timeout_s) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-        text = (body.get("response") or "").strip()
-        raw = json.loads(text[text.find("{"): text.rfind("}") + 1])
-        return {"hints": validate_hints(raw, prompt), "error": None, "latency_s": time.time() - started}
-    except Exception as exc:
-        code = getattr(exc, "code", None)
-        message = (f"model '{model}' is not installed (run: ollama pull {model})" if code == 404
-                   else f"{type(exc).__name__}: {str(exc)[:80]}")
-        return {"hints": None, "error": message, "latency_s": time.time() - started}
+    last_error = "no response"
+    for response_format in (SCHEMA, "json"):  # schema-constrained decoding first, then loose JSON mode
+        payload["format"] = response_format
+        try:
+            request = urllib.request.Request(base_url + "/api/generate", data=json.dumps(payload).encode("utf-8"),
+                                             headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(request, timeout=timeout_s) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            text = (body.get("response") or "").strip()
+            start, end = text.find("{"), text.rfind("}")
+            if start < 0 or end <= start:
+                raise ValueError(f"no JSON object in model output: {text[:60]!r}")
+            raw = json.loads(text[start:end + 1])
+            return {"hints": validate_hints(raw, prompt), "error": None, "latency_s": time.time() - started}
+        except Exception as exc:
+            code = getattr(exc, "code", None)
+            if code == 404:
+                return {"hints": None, "error": f"model '{model}' is not installed (run: ollama pull {model})",
+                        "latency_s": time.time() - started}
+            last_error = f"{type(exc).__name__}: {str(exc)[:100]}"
+    return {"hints": None, "error": last_error, "latency_s": time.time() - started}
 
 
 def apply_hints(spec: Dict[str, Any], hints: Dict[str, Any], prompt: str) -> List[str]:

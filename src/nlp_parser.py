@@ -9,7 +9,7 @@ import os
 import re
 from src.text_matching import as_keyword_text
 from src.compatibility import (MELTS, detect_melt, detect_requested_family, galvanic_advisory, is_stirring_duty,
-                               media_exclusions, melt_assumptions)
+                               media_exclusions, melt_assumptions, negated_exposure, parse_requirements)
 from src.ashby_engine import AshbyIndex, derive_selection_guide
 
 _ML_INTENT_MODEL = None
@@ -92,6 +92,13 @@ class NLPTranslationLayer:
         galvanic = galvanic_advisory(prompt, family)
         if galvanic:
             advisories.append(galvanic)
+        ruled_out = negated_exposure(prompt)
+        if "marine" in ruled_out:
+            for flag in ("submerged_aquatic_exposure", "marine_industrial_exposure", "chemical_or_saline_exposure"):
+                boundary[flag] = False
+        if "uv" in ruled_out:
+            boundary["outdoor_uv_exposure"] = False
+        boundary["requirements"] = parse_requirements(prompt)
         boundary["requested_material_family"] = family
         boundary["excluded_material_families"] = excluded
         spec["advisories"] = advisories
@@ -461,7 +468,14 @@ class NLPTranslationLayer:
 
         # 6. Deduce Ashby Performance Index based on Physical Domain Intent
         is_torsion_shaft = bool(re.search(r"(drive ?shaft|propeller shaft|turbine shaft|shaft[^.]{0,40}torsion|torsion[^.]{0,40}shaft|torque[^.]{0,40}shaft|shaft[^.]{0,40}torque)", prompt_lower)) and not any(w in prompt_lower for w in ["fatigue", "flywheel", "centrifug", "burst", "shock", "cryo"])
-        if is_torsion_shaft:
+        is_compression_strut = any(w in prompt_lower for w in [
+            "support column", "structural column", "slender column", "compression member", "strut", "pushrod", "push rod",
+            "pullrod", "pull rod", "wishbone", "control arm"]) and not is_dewar_strut
+        if is_compression_strut and not is_torsion_shaft:
+            ashby_key = AshbyIndex.COLUMN_BUCKLING
+            ashby_reasoning = ("Slender member loaded axially between pin joints: elastic (Euler) buckling governs the minimum mass, "
+                               "so M = E^(1/2) / ρ is maximised.")
+        elif is_torsion_shaft:
             ashby_key = AshbyIndex.SHAFT_TORSION
             ashby_reasoning = "Shaft transmitting torque under a twist/stiffness constraint: M7 = G^(1/2) / ρ."
         elif is_speaker_cone:

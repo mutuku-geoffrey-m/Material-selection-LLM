@@ -122,7 +122,44 @@ def galvanic_advisory(prompt: str, requested_family: Optional[str]) -> Optional[
 _HIGH_STRENGTH_SERIES = re.compile(r"(?:alloy|alclad)\s+(?:20)?[27]\d{3}\b")
 
 
+_NEGATION = r"(?:no|not|without|free of|free from|never|zero)"
+
+
+def negated_exposure(prompt: str) -> set:
+    """Exposure categories the brief explicitly rules out (for example "no seawater exposure")."""
+    text = (prompt or "").lower()
+    ruled_out = set()
+    if re.search(rf"\b{_NEGATION}\s+(?:\w+\s+){{0,3}}?(?:seawater|sea water|salt water|saltwater|marine|saline|coastal|brackish|submerg\w*)", text):
+        ruled_out.add("marine")
+    if re.search(rf"\b{_NEGATION}\s+(?:\w+\s+){{0,3}}?(?:uv|sunlight|solar|outdoor)", text):
+        ruled_out.add("uv")
+    return ruled_out
+
+
+def parse_requirements(prompt: str) -> Dict[str, Optional[float]]:
+    """Numerical requirements stated in the brief: cost limit (USD/kg), delivery limit (days) and batch size (kg)."""
+    text = (prompt or "").lower().replace(",", "")
+    cost = re.search(r"(?:under|below|less than|no more than|at most|maximum of|max\.?)\s*\$?\s*(\d+(?:\.\d+)?)\s*(?:dollars?|usd|us\$|\$)?\s*(?:per|/|a|each)\s*(?:kg|kilogram)", text)
+    days = re.search(r"(?:within|in|inside|under|by)\s*(\d+)\s*(?:working\s*)?days?", text)
+    batch = re.search(r"(\d+(?:\.\d+)?)\s*kg\s*(?:prototype\s*)?(?:batch|order|lot|quantity|run)|(?:batch|order|lot|quantity)\s*of\s*(\d+(?:\.\d+)?)\s*kg", text)
+    return {"max_cost_usd_kg": float(cost.group(1)) if cost else None,
+            "max_lead_days": float(days.group(1)) if days else None,
+            "batch_kg": float(next(g for g in batch.groups() if g)) if batch else None}
+
+
+_CONVENTIONAL_MACHINING = re.compile(r"\b(?:cnc|milling|turning|drilling|conventional machining|lathe)\b")
+
+
+def commentary_contradicts_directive(commentary: str, record: Dict) -> bool:
+    """A sintered ceramic is finished by diamond grinding; advice to mill, turn or drill it contradicts the fabrication directive."""
+    family = str(record.get("family", "")).lower()
+    text = (commentary or "").lower()
+    return "ceramic" in family and bool(_CONVENTIONAL_MACHINING.search(text)) and "diamond" not in text
+
+
 def marine_service(prompt: str) -> bool:
+    if "marine" in negated_exposure(prompt):
+        return False
     text = (prompt or "").lower()
     return any(w in text for w in ("marine", "seawater", "sea water", "saltwater", "salt water", "coastal", "offshore", "brackish"))
 
@@ -232,3 +269,61 @@ def melt_assumptions(melt: str, stated_temperature_c: Optional[float]) -> Tuple[
     else:
         temperature = stated_temperature_c
     return temperature, notes
+
+
+_SCC_TEMPER = re.compile(r"(?:alloy|alclad)\s+(?:20)?[27]\d{3}-t6(?:51|511|2)?\b")
+_SAFETY_CRITICAL_WORDS = ("suspension", "wishbone", "control arm", "steering", "brake", "chassis", "roll cage", "crane", "hoist",
+                          "lifting", "rigging", "landing gear", "pushrod", "push rod", "racing", "aircraft", "aerospace")
+_METAL_FAMILY_WORDS = ("metal", "alloy", "steel", "titanium", "iron", "copper", "brass", "nickel")
+
+
+def is_scc_susceptible_temper(entry: Dict) -> bool:
+    """2xxx and 7xxx aluminium in the peak-aged T6 family of tempers is prone to stress-corrosion cracking."""
+    return bool(_SCC_TEMPER.search(str(entry.get("name", "")).lower()))
+
+
+def safety_critical_duty(prompt: str) -> bool:
+    text = (prompt or "").lower()
+    return any(w in text for w in _SAFETY_CRITICAL_WORDS)
+
+
+def fails_safety_critical_screen(entry: Dict, minimum_elongation_percent: float = 8.0, minimum_yield_mpa: float = 200.0) -> bool:
+    """Metals for safety-critical members must be wrought, strong enough, ductile and free of stress-corrosion susceptibility."""
+    record = MATERIALS_DATABASE.get(entry.get("key"), entry)
+    family = str(record.get("family", "")).lower()
+    if not any(w in family or w in str(record.get("name", "")).lower() for w in _METAL_FAMILY_WORDS):
+        return False  # polymers and composites are assessed by other criteria
+    if re.search(r"\b(?:cast|casting|sand|die-cast|permanent mold)\b", str(record.get("name", "")).lower()):
+        return True  # cast grades carry porosity and scatter in fatigue life; wrought grades are required for primary load paths
+    yield_strength = record.get("yield_strength")
+    if yield_strength is not None and float(yield_strength) < minimum_yield_mpa:
+        return True  # stiffness indices do not depend on strength, so a strength floor is applied to load-bearing metals
+    elongation = record.get("elongation_at_break")
+    if elongation is not None and float(elongation) < minimum_elongation_percent:
+        return True
+    return is_scc_susceptible_temper(record)
+
+
+def process_note(record: Dict) -> str:
+    """Typical manufacturing route for a catalogue grade, by material family."""
+    family = str(record.get("family", "")).lower()
+    if "composite" in family:
+        return "Laminated and cured (autoclave or vacuum bag); CNC trimming"
+    if "ceramic" in family:
+        return "Pressed and sintered; diamond grinding"
+    if "elastomer" in family:
+        return "Moulding or extrusion"
+    if any(w in family for w in ("polymer", "thermoplastic", "polyamide")):
+        return "Injection moulding, extrusion or machining from stock"
+    return "CNC machining, casting or forming (grade-dependent)"
+
+
+def load_modes(prompt: str) -> List[str]:
+    """Load cases named in the brief (compression, torsion, bending, tension)."""
+    text = (prompt or "").lower()
+    modes = []
+    for label, words in (("compression", ("compress", "axial load", "buckling")), ("torsion", ("torque", "torsion", "twist")),
+                         ("bending", ("bending", "flexur", "cantilever", "deflection")), ("tension", ("tension", "tensile", "pull"))):
+        if any(w in text for w in words):
+            modes.append(label)
+    return modes

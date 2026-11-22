@@ -702,10 +702,10 @@ with col_left:
     with c_bnd2:
         annual_demand_kg = st.number_input(
             "Annual Production Demand (kg)",
-            min_value=50.0,
+            min_value=1.0,
             max_value=1000000.0,
             value=1500.0,
-            step=250.0,
+            step=10.0,
             help="Evaluates Economic Order Quantity (EOQ) batch sizing and Minimum Order Quantity (MOQ)."
         )
 

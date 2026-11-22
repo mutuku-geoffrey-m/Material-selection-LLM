@@ -23,6 +23,8 @@ Academic Citations:
 import math
 from typing import Dict, Any, List, Optional, Tuple
 
+from src.compatibility import is_high_strength_aluminium_series
+
 
 class EconomicsEngine:
     """
@@ -505,6 +507,8 @@ class EconomicsEngine:
             source_cat = tech_econ.get("sourcing_category") or "Asian Manufacturing Hubs"
         else:
             source_cat = tech_econ.get("sourcing_category") or "Asian Manufacturing Hubs"
+        if is_high_strength_aluminium_series(material_data):
+            source_cat = "European Specialty Mills"  # 2xxx and 7xxx aerospace alloys are imported, not produced in East Africa
 
         moq_kg = float(tech_econ.get("minimum_order_quantity_kg", 25.0))
         machinability = float(tech_econ.get("machinability_rating_percent", 60.0))

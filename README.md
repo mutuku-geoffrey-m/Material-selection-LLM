@@ -154,6 +154,8 @@ To rebuild the executable, run `launcher\build_exe.bat` on a Windows computer wi
 | `GEMINI_API_KEY`, `OPENAI_API_KEY` | empty | Optional keys for cloud arbitration of near-ties |
 | `STREAMLIT_SERVER_PORT` | 8501 | Interface port |
 
+The report also checks the cost limit, delivery limit and quantity stated in the brief against the evaluated candidates, honours explicit exclusions such as "no seawater exposure", and notes when several load cases are stated but a single governing index is used.
+
 Cloud arbitration runs automatically when the top two candidates differ by no more than 8 % on the governing index; it uses the configured API key or, if none is set, the local model.
 
 ### 4.4 Troubleshooting
@@ -201,6 +203,8 @@ The test suite is run with `python -m unittest discover -s tests`. It covers the
 ## 7. Limitations
 
 - The language model is small (3 billion parameters). Its output is validated and its commentary is restricted to catalogue values, but unusual briefs may still be misread and the commentary must be verified before use; the decision provenance panel shows when the rule-based parser was used instead.
+- Slender compression members (struts, push-rods, wishbones and support columns) are ranked by the Euler-buckling index $E^{1/2}/\rho$, which has the same form as the beam-stiffness index M3 and is reported under its own label. For safety-critical duty, cast grades, metals below 200 MPa yield strength or 8 % elongation, and 2xxx or 7xxx aluminium in the T6 tempers (susceptible to stress-corrosion cracking) are excluded, and grades with equal index values are ordered by yield strength.
+- Catalogue prices, lead times and sourcing categories are family-level estimates (for example, one price for all aluminium alloys), so grades of the same base metal are separated mainly by their properties. Aerospace-grade 2xxx and 7xxx aluminium is assigned to a European source. These figures should be replaced with supplier quotations before procurement decisions, and toughness, weldability and fabrication cost are not modelled (for example, 4130 steel is the usual choice for tubular racing suspension members, but ranks below aluminium on stiffness per unit mass).
 - The molten-media table is general engineering guidance covering the melts listed above and should be confirmed against supplier and handbook data. The catalogue currently contains four technical ceramics and no graphite, zirconia, silicon nitride or refractory metals, so refractory selections are limited to alumina and silicon carbide until further grades are added.
 - Selection is governed by the Ashby index of the identified load case together with hard gating rules. Properties such as corrosion behaviour, wear and joining are modelled only where an explicit rule exists.
 - Prices, lead times and availability are catalogue estimates and should be confirmed with suppliers before procurement.
