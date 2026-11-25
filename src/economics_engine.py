@@ -634,12 +634,12 @@ class EconomicsEngine:
             return []
 
         w = weights or {
-            "tech": 0.35,      # Ashby performance index
-            "cost": 0.25,      # Landed cost (USD/kg)
-            "lead_mean": 0.15, # Expected lead time (days)
-            "lead_std": 0.10,  # Lead-time variance/volatility (days)
-            "moq_pen": 0.05,   # MOQ small-lot cost penalty (USD)
-            "security": 0.10   # 1 - Kraljic supply risk
+            "tech": 0.35,       # Ashby performance index
+            "cost": 0.25,       # Landed cost (USD/kg)
+            "lead_mean": 0.09,  # Expected lead time (days)
+            "lead_std": 0.06,   # Lead-time standard deviation (days)
+            "moq_pen": 0.10,    # MOQ small-lot cost penalty (USD)
+            "security": 0.15    # 1 - Kraljic supply risk
         }
 
         # Normalize weights to sum to 1.0
@@ -784,7 +784,7 @@ class EconomicsEngine:
             "cost": w_cost,
             "lead_mean": w_lead * 0.60,
             "lead_std": w_lead * 0.40,
-            "moq_pen": 0.05,
+            "moq_pen": w_mfg,
             "security": w_avail
         }
         if admissible_entries:
@@ -794,6 +794,12 @@ class EconomicsEngine:
 
         # Concatenate admissible ranked items followed by gated disqualified items
         final_ranked_list = admissible_entries + disqualified_entries
+
+        # Relative price index: delivered cost divided by the lowest delivered cost among the listed candidates (1.00 = cheapest)
+        listed_costs = [e["economics"]["landed_cost_usd_per_kg"] for e in final_ranked_list if e["economics"]["landed_cost_usd_per_kg"] > 0]
+        cheapest_listed = min(listed_costs) if listed_costs else 1.0
+        for entry in final_ranked_list:
+            entry["economics"]["relative_price_index"] = round(entry["economics"]["landed_cost_usd_per_kg"] / cheapest_listed, 2)
 
         # Assign explicit ranks and strategic verdicts
         for rank, entry in enumerate(final_ranked_list, 1):

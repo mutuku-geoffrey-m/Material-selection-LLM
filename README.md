@@ -29,7 +29,7 @@ The pipeline comprises the following stages.
 2. **Physical gating.** Materials that cannot satisfy hard constraints are removed, including service temperature, cryogenic ductility, optical transparency, non-magnetic service, requested family and chemical compatibility (for example liquid gallium against aluminium and copper). A table of common melts (gold, silver, platinum, copper, brass, bronze, aluminium, zinc, lead, tin, magnesium, glass and steel) records each melting point, the families the melt attacks and the families normally used to handle it; the stated service temperature is checked against the melting point, and a missing temperature is taken as the melting point plus 50 °C.
 3. **Ashby screening.** Analytical Ashby indices are evaluated for the governing load case over the materials catalogue.
 4. **Techno-economic evaluation.** Delivered Duty Paid cost to Nairobi via Mombasa is computed from each material's price, with freight, insurance, EAC customs duty, Import Declaration Fee, Railway Development Levy, VAT, port handling and clearance, together with lead-time safety stock and economic order quantity.
-5. **Multi-criteria ranking.** Candidates are ranked by vector-normalised TOPSIS over performance, landed cost, lead time and supply availability.
+5. **Multi-criteria ranking.** Candidates are ranked by vector-normalised TOPSIS over six criteria: the governing Ashby index (weight 0.35), delivered cost (0.25), mean lead time (0.09), lead-time standard deviation (0.06), minimum-order penalty (0.10) and supply security, one minus the Kraljic supply-risk coordinate (0.15). The leaderboard also reports a relative price index, the delivered cost divided by the lowest delivered cost among the listed candidates.
 6. **Report generation.** A report with manufacturing directives, advisories and sourcing analysis is produced. The local model contributes optional commentary after the ranking is complete; a missing or slow model never changes the ranking.
 
 The materials catalogue contains 1,510 grades: 1,490 catalogue records and 20 curated reference grades defined in `src/materials_db.py`. The count shown in the interface is read from the database at run time.
@@ -155,6 +155,8 @@ To rebuild the executable, run `launcher\build_exe.bat` on a Windows computer wi
 | `STREAMLIT_SERVER_PORT` | 8501 | Interface port |
 
 The report also checks the cost limit, delivery limit and quantity stated in the brief against the evaluated candidates, honours explicit exclusions such as "no seawater exposure", and notes when several load cases are stated but a single governing index is used.
+
+For cryogenic service, grades that lose ductility at low temperature (ferritic steels, cast irons, magnesium alloys and glassy thermoplastics) are excluded, and load-bearing supports such as dewar struts are ranked by the heat-leak index $\sigma_y/\lambda$; welded vacuum or pressure shells are restricted to weldable metals.
 
 Cloud arbitration runs automatically when the top two candidates differ by no more than 8 % on the governing index; it uses the configured API key or, if none is set, the local model.
 

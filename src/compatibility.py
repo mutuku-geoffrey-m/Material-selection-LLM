@@ -273,7 +273,7 @@ def melt_assumptions(melt: str, stated_temperature_c: Optional[float]) -> Tuple[
 
 _SCC_TEMPER = re.compile(r"(?:alloy|alclad)\s+(?:20)?[27]\d{3}-t6(?:51|511|2)?\b")
 _SAFETY_CRITICAL_WORDS = ("suspension", "wishbone", "control arm", "steering", "brake", "chassis", "roll cage", "crane", "hoist",
-                          "lifting", "rigging", "landing gear", "pushrod", "push rod", "racing", "aircraft", "aerospace")
+                          "lifting", "rigging", "landing gear", "pushrod", "push rod", "racing", "aircraft", "aerospace", "cryogenic", "dewar", "pressure vessel")
 _METAL_FAMILY_WORDS = ("metal", "alloy", "steel", "titanium", "iron", "copper", "brass", "nickel")
 
 
@@ -327,3 +327,49 @@ def load_modes(prompt: str) -> List[str]:
         if any(w in text for w in words):
             modes.append(label)
     return modes
+
+
+_AUSTENITIC = re.compile(r"30[1-9]\d{0,2}|31\d{1,3}|32\d{1,3}|34\d{1,3}|austenitic|nitronic|a286")
+_NON_AUSTENITIC_STAINLESS = re.compile(r"\b4[0-4]\d\b|17-4|\bph\b|ferritic|martensitic|duplex")
+_CRYOGENIC_POLYMERS = re.compile(r"ptfe|teflon|pctfe|polyimide|kapton|peek|epoxy|g10|fr4")
+_NINE_PERCENT_NICKEL = re.compile(r"9\s*%?\s*ni|a553|a353|invar|36\s*%?\s*ni")
+
+
+def cryogenic_ductile(record: Dict) -> bool:
+    """Whether a grade keeps useful ductility at liquid-nitrogen and liquid-helium temperature.
+
+    Face-centred-cubic metals (aluminium, copper, nickel alloys, austenitic stainless steel) and titanium remain tough.
+    Body-centred-cubic steels and cast irons, magnesium and glassy thermoplastics become brittle.
+    """
+    name = str(record.get("name", "")).lower()
+    family = str(record.get("family", "")).lower()
+    if "magnesium" in family or "magnesium" in name:
+        return False
+    if any(w in family for w in ("thermoplastic", "polymer", "elastomer", "polyamide")) and "composite" not in family:
+        return bool(_CRYOGENIC_POLYMERS.search(name))
+    if "composite" in family:
+        return "continuous" in family  # continuous-fibre thermoset laminates; short-fibre thermoplastic composites embrittle
+    if "stainless" in family or "stainless" in name:
+        if _NON_AUSTENITIC_STAINLESS.search(name):
+            return False
+        return bool(_AUSTENITIC.search(name)) or "316" in name or "304" in name
+    if "steel" in family or "steel" in name or ("iron" in family and "cast" in family):
+        return bool(_NINE_PERCENT_NICKEL.search(name))
+    density = record.get("density")
+    if density and 7500.0 <= float(density) <= 7950.0 and not _NINE_PERCENT_NICKEL.search(name):
+        return False  # ferritic steel by density where the grade name does not say so (for example national designations)
+    return True
+
+
+_WELDED_STRUCTURE_WORDS = ("weld", "vacuum jacket", "pressure vessel", "tank", "dewar", "boiler", "cryostat")
+
+
+def welded_structure(prompt: str) -> bool:
+    text = (prompt or "").lower()
+    return any(w in text for w in _WELDED_STRUCTURE_WORDS)
+
+
+def is_metal(record: Dict) -> bool:
+    family = str(record.get("family", "")).lower()
+    name = str(record.get("name", "")).lower()
+    return any(w in family or w in name for w in _METAL_FAMILY_WORDS) and "composite" not in family and "polymer" not in family

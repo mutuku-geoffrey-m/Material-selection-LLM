@@ -32,6 +32,7 @@ class AshbyIndex:
     THERMAL_CONDUCTIVITY = "thermal_conductivity" # M = lambda (Steady-state heat conduction / heat sinks)
     THERMAL_INSULATION = "thermal_insulation"     # M = 1 / lambda (Thermal barriers)
     COLUMN_BUCKLING = "column_buckling"           # M = E^(1/2) / rho (Slender compression members, Euler buckling)
+    CRYOGENIC_STRUT = "cryogenic_strut"           # M = sigma_y / lambda (Minimum heat leak for a load-bearing support)
     SHAFT_TORSION = "shaft_torsion"               # M7 = G^(1/2) / rho (Torsional shaft stiffness)
     COST_NORMALIZED_TIE = "cost_normalized_tie"   # M9 = sigma_y / (rho * C_m) (Cost-normalized tensile tie)
     FATIGUE_EFFICIENCY = "fatigue_efficiency"   # M = sigma_fatigue / rho (Cyclic loading)
@@ -115,6 +116,12 @@ INDEX_DESCRIPTIONS = {
         "name": "Slender Column in Compression (Euler Buckling)",
         "formula": "E^(1/2) / ρ",
         "primary_application": "Pin-jointed struts, push-rods, wishbone members and support columns loaded axially",
+        "maximize": True
+    },
+    AshbyIndex.CRYOGENIC_STRUT: {
+        "name": "Cryogenic Support Strut (Minimum Heat Leak)",
+        "formula": "σ_y / λ",
+        "primary_application": "Suspension struts, neck tubes and support columns that carry load into a cold vessel while limiting conductive heat leak",
         "maximize": True
     },
     AshbyIndex.SHAFT_TORSION: {
@@ -220,6 +227,12 @@ def calculate_ashby_index(material: Dict[str, Any], index_key: str, use_printed_
     elif index_key == AshbyIndex.COLUMN_BUCKLING:
         # Euler buckling of a slender column of fixed length and load: minimum mass for maximum E^(1/2) / rho
         return math.sqrt(E_gpa) / (rho / 1000.0)
+
+    elif index_key == AshbyIndex.CRYOGENIC_STRUT:
+        # For a tie carrying force F between temperatures T1 and T2, the heat leak is lambda * (F / sigma_y) * dT / L,
+        # so heat leak is minimised by maximising sigma_y / lambda.
+        lam = material.get("thermal_conductivity")
+        return sigma_y_mpa / float(lam) if lam and float(lam) > 0 else 0.0
 
     elif index_key == AshbyIndex.SHAFT_TORSION:
         # M7 = G^(1/2) / (rho/1000), G in GPa. Falls back to E / (2(1+nu)) when G is not tabulated.
@@ -670,8 +683,6 @@ def rank_materials(
             is_magnesium = "magnesium" in mat.get("family", "").lower() or "magnesium" in mat.get("name", "").lower()
             if mat_key in ["Alloy_Steel_4140", "PLA", "TPU_95A", "PETG"] or is_ferritic_carbon_steel or is_magnesium:
                 cryo_penalty = 0.0001
-            elif mat_key in ["Stainless_Steel_316L", "Titanium_Ti6Al4V", "Inconel_718"]:
-                cryo_penalty = 8.0
             # Industrial cryogenic vacuum barrier plates / cold-boxes (-80°C to -196°C):
             # Short-fiber printed polymers microcrack under vacuum and thermal shock; welded 316L or 6061-T6 are mandatory
             if any(w in prompt_lower for w in ["vacuum barrier", "cold-box", "cold box"]):
@@ -681,13 +692,6 @@ def rank_materials(
                     cryo_penalty = 12.0
                 elif mat_key in ["Titanium_Ti6Al4V", "Inconel_718"]:
                     cryo_penalty = 0.5
-            # Cryogenic helium dewar support strut: must minimize conductive heat leak into 4K helium (thermal intercept)
-            # Aluminium and Copper conduct 25x to 60x more heat than Titanium, Stainless 316L, and CFRP
-            if dewar_support_strut:
-                if mat_key in ["Aluminium_6061_T6", "Copper_C11000"]:
-                    cryo_penalty = 0.005
-                elif mat_key in ["Titanium_Ti6Al4V", "Stainless_Steel_316L", "CFRP_Prepreg"]:
-                    cryo_penalty = 3.0
 
         # Chemical & Strong Acid Compatibility Factor
         chem_factor = 1.0

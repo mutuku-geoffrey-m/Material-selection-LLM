@@ -464,14 +464,18 @@ class NLPTranslationLayer:
         is_cryogenic = any(w in prompt_lower for w in ["cryo", "liquid nitrogen", "liquid helium", "liquid oxygen", "liquid hydrogen", "dewar", "below zero", "-50", "-70", "-100", "-120", "-162", "-183", "-196", "-253", "-269", "4 kelvin"])
         if target_temp_c is not None and target_temp_c < -20.0:
             is_cryogenic = True
-        is_dewar_strut = is_cryogenic and any(w in prompt_lower for w in ["strut", "dewar support", "dewar strut", "suspension strut"]) and not any(w in prompt_lower for w in ["busbar", "thermal anchor busbar", "conductor"])
+        is_dewar_strut = is_cryogenic and any(w in prompt_lower for w in ["strut", "dewar support", "dewar strut", "suspension strut", "neck tube", "support column", "support tube", "support rod", "suspension rod", "hanger"]) and not any(w in prompt_lower for w in ["busbar", "thermal anchor busbar", "conductor"])
 
         # 6. Deduce Ashby Performance Index based on Physical Domain Intent
         is_torsion_shaft = bool(re.search(r"(drive ?shaft|propeller shaft|turbine shaft|shaft[^.]{0,40}torsion|torsion[^.]{0,40}shaft|torque[^.]{0,40}shaft|shaft[^.]{0,40}torque)", prompt_lower)) and not any(w in prompt_lower for w in ["fatigue", "flywheel", "centrifug", "burst", "shock", "cryo"])
         is_compression_strut = any(w in prompt_lower for w in [
             "support column", "structural column", "slender column", "compression member", "strut", "pushrod", "push rod",
             "pullrod", "pull rod", "wishbone", "control arm"]) and not is_dewar_strut
-        if is_compression_strut and not is_torsion_shaft:
+        if is_dewar_strut and not is_torsion_shaft:
+            ashby_key = AshbyIndex.CRYOGENIC_STRUT
+            ashby_reasoning = ("Load-bearing support between ambient and cryogenic temperature: for a given force, conductive heat "
+                               "leak scales with λ/σ_y, so σ_y / λ is maximised.")
+        elif is_compression_strut and not is_torsion_shaft:
             ashby_key = AshbyIndex.COLUMN_BUCKLING
             ashby_reasoning = ("Slender member loaded axially between pin joints: elastic (Euler) buckling governs the minimum mass, "
                                "so M = E^(1/2) / ρ is maximised.")
@@ -706,8 +710,11 @@ class NLPTranslationLayer:
     def _extract_temperature_c(text: str) -> Optional[float]:
         """Extract a service temperature in Celsius. Tolerates typos ('celcius'), 'degrees C', 'centigrade',
         degrees Fahrenheit and kelvin. Returns the highest temperature mentioned (the governing case)."""
+        original = text
         t = text.lower().replace("º", "°").replace("˚", "°")
         found = []
+        for m in re.finditer(r'(\d+(?:[.,]\d+)?)\s*K\b', original):  # capital K: kelvin (kg and km do not match)
+            found.append(float(m.group(1).replace(",", ".")) - 273.15)
         for m in re.finditer(r'(-?\d+(?:[.,]\d+)?)\s*(?:°|degrees?|degs?\.?)?\s*(cel\w{0,6}|centigrade|c)\b', t):
             found.append(float(m.group(1).replace(",", ".")))
         for m in re.finditer(r'(-?\d+(?:[.,]\d+)?)\s*(?:°|degrees?|degs?\.?)?\s*(fahrenheit|f)\b', t):

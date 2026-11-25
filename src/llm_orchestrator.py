@@ -8,7 +8,7 @@ import os
 import re
 from src.text_matching import as_keyword_text
 from src.materials_db import MATERIALS_DATABASE
-from src.compatibility import (FAMILY_LABELS, commentary_contradicts_directive, load_modes, fails_safety_critical_screen, process_note, safety_critical_duty, service_limit_c, belongs_to_family, family_member_keys,
+from src.compatibility import (FAMILY_LABELS, is_metal, welded_structure, cryogenic_ductile, commentary_contradicts_directive, load_modes, fails_safety_critical_screen, process_note, safety_critical_duty, service_limit_c, belongs_to_family, family_member_keys,
                                is_high_strength_aluminium_series, marine_service)
 import json
 import time
@@ -367,6 +367,33 @@ Do NOT use conversational fluff or filler. Begin directly with the analysis.
                                   f"unrestricted ranking is shown and should be treated as indicative only."
                                   + (f" The {label} family is not recommended for this brief." if requested_family else ""))
 
+        # Cryogenic service: grades that lose ductility at low temperature are excluded.
+        if boundary.get("is_cryogenic"):
+            tough = [m for m in ranked_materials if cryogenic_ductile(MATERIALS_DATABASE.get(m.get("key"), m))]
+            if tough and len(tough) < len(ranked_materials):
+                ranked_materials = tough
+                advisories.append("Cryogenic service: ferritic and martensitic steels, cast irons, magnesium alloys and glassy thermoplastics "
+                                  "were excluded because they lose ductility at low temperature.")
+
+        # Welded structures: 2xxx and most 7xxx aluminium grades cannot be fusion-welded without losing strength or cracking.
+        if welded_structure(user_prompt):
+            weldable = [m for m in ranked_materials if not is_high_strength_aluminium_series(m)]
+            if weldable and len(weldable) < len(ranked_materials):
+                ranked_materials = weldable
+                advisories.append("Welded structure: 2xxx and 7xxx aluminium grades were excluded because they are not generally fusion-weldable.")
+            if str(ashby_key) != "cryogenic_strut":
+                metallic = [m for m in ranked_materials if is_metal(MATERIALS_DATABASE.get(m.get("key"), m))]
+                if metallic and len(metallic) < len(ranked_materials):
+                    ranked_materials = metallic
+                    advisories.append("Welded vacuum or pressure shell: non-metallic grades were excluded.")
+
+        # A load-bearing cryogenic support must have usable absolute strength, not only a favourable strength-to-conductivity ratio.
+        if str(ashby_key) == "cryogenic_strut":
+            strong = [m for m in ranked_materials if float(MATERIALS_DATABASE.get(m.get("key"), {}).get("yield_strength") or 0.0) >= 200.0]
+            if strong and len(strong) < len(ranked_materials):
+                ranked_materials = strong
+                advisories.append("Load-bearing cryogenic support: grades below 200 MPa yield strength were excluded.")
+
         # Safety-critical load paths: ductile failure and freedom from stress-corrosion cracking are required of metals.
         if safety_critical_duty(user_prompt):
             screened = [m for m in ranked_materials if not fails_safety_critical_screen(m)]
@@ -651,6 +678,7 @@ Write three short paragraphs headed "Material rationale", "Principal failure ris
                 table_rows.append(
                     f"| {item['overall_rank']} | **{item['name']}** | {item['family']} | "
                     f"{item['technical_ashby_score']:.2f} | \\${exw:.2f} / **\\${ddp:.2f}** | "
+                    f"{item['economics'].get('relative_price_index', 1.0):.2f}x | "
                     f"{origin} | {lead:.0f}d (SS: {ss_kg:.1f}kg) | "
                     f"**{quad}** | MOQ: {moq:.0f}kg / EOQ: {eff_eoq:.0f}kg | "
                     f"**{score:.1f}** |"
@@ -663,14 +691,14 @@ Write three short paragraphs headed "Material rationale", "Principal failure ris
 ### Techno-Economic, Sourcing & Supply Chain Availability Leaderboard
 *Evaluated for Annual Project Demand $D = {annual_demand_kg:,.0f}\\text{{ kg}}$ via Incoterms 2020 Total Landed Cost (TLC: EXW to DDP Nairobi via Mombasa Port), Silver-Pyke-Peterson Lead-Time Variance, Wilson-Harris EOQ, Kraljic Matrix Portfolio Risk, and Hwang-Yoon Vector-Normalized TOPSIS ($C_i^*$).*
 
-| Rank | Material | Family | Ashby Score | Cost (EXW / DDP) | Sourcing Origin | Lead Time (Safety Stock) | Kraljic Quadrant | MOQ / Effective EOQ | TOPSIS Score |
-| :---: | :--- | :--- | :---: | :---: | :--- | :---: | :---: | :--- | :---: |
+| Rank | Material | Family | Ashby Score | Cost (EXW / DDP) | Relative Price | Sourcing Origin | Lead Time (Safety Stock) | Kraljic Quadrant | MOQ / Effective EOQ | TOPSIS Score |
+| :---: | :--- | :--- | :---: | :---: | :---: | :--- | :---: | :---: | :--- | :---: |
 """ + "\n".join(table_rows) + f"""
 
 **Supply Chain Sourcing Analysis:**
 - **Highest technical performance:** `{ranked_materials[0]['name']}` has the best Ashby index among the screened candidates; the TOPSIS ranking below also weights landed cost, lead time and supply risk, so its first-ranked grade can differ.
 - **Rank 1 Optimal Trade-Off:** `{techno_economic_leaderboard[0]['name']}` achieved the highest overall TOPSIS composite score ({techno_economic_leaderboard[0]['composite_score']:.1f}/100) balancing continuum mechanics performance against procurement lead times, tariffs, and carrying costs.
-- **Incoterms 2020 Total Landed Cost (TLC):** Evaluates mill price $C_{{EXW}}$, international ocean/air freight, marine insurance (0.40% on 110% of FOB + freight), Kenyan customs tariffs (EAC CET 0% to 25%, IDF 2.5%, RDL 2.0%, VAT 16.0%), port handling at Mombasa Port (\\$0.08/kg), and SGR inland freight to Nairobi (\\$0.10/kg).
+- **Incoterms 2020 Total Landed Cost (TLC):** Evaluates mill price $C_{{EXW}}$, international ocean/air freight, marine insurance (0.40% on 110% of FOB + freight), Kenyan customs tariffs (EAC CET 0% to 35%, IDF 2.5%, RDL 2.0%, VAT 16.0%), port handling at Mombasa Port (\\$0.08/kg), and SGR inland freight to Nairobi (\\$0.10/kg).
 - **Stochastic Lead Time & Safety Stock ($SS$):** Formulated via Silver, Pyke & Peterson (1998): $SS = z_{{\\alpha}} \\sqrt{{\\mu_L \\sigma_D^2 + D^2 \\sigma_L^2}}$ at 95% service level ($z = 1.645$) to guarantee zero plant stockouts despite maritime transit volatility.
 - **Kraljic Portfolio Matrix (Kraljic, 1983):** Classifies candidate materials into Strategic (high profit impact, high supply risk), Bottleneck (low profit impact, high supply risk), Leverage (high profit impact, low supply risk), or Routine (low profit impact, low supply risk).
 - **Wilson-Harris EOQ & MOQ Constraint:** Optimal procurement batch size is calculated as $Q^* = \\sqrt{{\\frac{{2DS}}{{H}}}}$ with Hadley-Whitin quantity breaks and excess inventory horizon checks ($Q_{{MOQ}}/D \\le \\tau_{{shelf}}$).
